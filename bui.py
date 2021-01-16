@@ -136,6 +136,8 @@ class Bui:
                 found = self.pattern_text.match(val)
                 if val.name == 'KEY_ENTER':
                     break
+                elif val.is_sequence:
+                    print("got sequence: {0}.".format((str(val), val.name, val.code)))
                 elif val.name == 'KEY_BACKSPACE' or val.name == 'KEY_DELETE':
                     self.print(" " * len(result), input_offset, input_height)
                     result = result[:-1]
@@ -173,32 +175,59 @@ class Bui:
         self.print(self.window_text(self.title), final_location, 0)
 
     def set_main_title(self, new_title):
-        new_title = new_title[0:self.width]  # Truncate titles to the length of the terminal window
+        if new_title is not None:
+            new_title = new_title[0:self.width]  # Truncate titles to the length of the terminal window
         self.title = new_title
         self._display_main_title()
 
-
-        pass
-
-    def ask_text(self, question):
-        pass
-
-
     def ask_list(self, question, menu_list):
-        pass
+        menu_height = self.height // 2
+        menu_offset = self.width // 2
+        menu_top = menu_height - (len(menu_list) + 1)
+
+        question[0:self.width - 2]  # Truncate questions to the length of the terminal window
+        self.print(f"{question}", (menu_offset - len(question)), menu_top - 2)
+
+        index = 0
+        for menu_item in menu_list:
+            item_offset = menu_offset
+            self.print(f"{menu_item}", item_offset, (menu_top + index))
+            index += 2
+
+        index = 0
+        index_max = len(menu_list) - 1
+        with self.term.cbreak():
+            while True:
+                self.print(f"{self.term.reverse}{menu_list[index]}", menu_offset, (menu_top + (index * 2)))
+                val = self.term.inkey()
+                if val.name == 'KEY_ENTER':
+                    break
+                elif val.name == 'KEY_UP':
+                    self.print(f"{menu_list[index]}", menu_offset, (menu_top + (index * 2)))
+                    index -= 1
+                    if index < 0:
+                        index = index_max
+                elif val.name == 'KEY_DOWN':
+                    self.print(f"{menu_list[index]}", menu_offset, (menu_top + (index * 2)))
+                    index += 1
+                    if index > index_max:
+                        index = 0
+
+        return menu_list[index]
+
+
+
+        return result
 
     def ask_yn(self):
         pass
-
-    def test(self):
-        result = self.ask_text("question text here")
-        self.message(f"result= {result}")
-
 
 if __name__ == "__main__":
     ui = Bui()
     ui.clear()
     ui.set_main_title("this is a test title")
+    result = ui.ask_list("Question text goes here", ["first item here", "this is the second item", "and this is the third"])
+    ui.print(f"{ui.bold(result)}")
     results = ui.input("This is a question")
     ui.print(f"{ui.bold('some text')} {results}")
     ui.print_center("this is just a test of things")
