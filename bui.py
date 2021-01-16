@@ -107,7 +107,7 @@ class Bui:
                 val = ''
                 val = self.term.inkey()
                 found = self.pattern_text.match(val)
-                if val.name != 'KEY_ENTER':
+                if val.name == 'KEY_ENTER':
                     break
                 elif found is not None:
                     if (len(result) + 1) <= max_len:
