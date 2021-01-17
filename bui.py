@@ -6,6 +6,10 @@ class Bui:
     def __init__(self):
         self._title = None
         self._pattern_text = re.compile('([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+')
+
+        self._low_latency_index = 0
+        self._low_latency_max = 100
+
         self.term = Terminal()
         self.term.enter_fullscreen
         self.height = self.term.height
@@ -22,6 +26,17 @@ class Bui:
         self.warn_style = f"{self.term.normal}{self.term.yellow}{self.warn_bg}"
 
         self._contents_console = []
+
+    def _skip_iteration(self, is_low_latency_enabled):
+        if is_low_latency_enabled:
+            if  self._low_latency_index >= self._low_latency_max:  # Low latency was set, have we hit max?
+                # We hit the max, so run this iteration and reset index
+                self._low_latency_index = 0
+                return False
+            else:
+                self._low_latency_index += 1  # Have not hit max, so increment
+                return True  # and skip this execution
+        return False
 
     def _get_time_string(self):
         now = datetime.datetime.now()
@@ -54,7 +69,9 @@ class Bui:
         for row in range(1, self.height):
             self.print(bar, 0, row)
 
-    def console(self, text):
+    def console(self, text, low_latency=False):
+        if self._skip_iteration(low_latency):
+            return
         self._contents_console.append(text)
         if len(self._contents_console) >= (self.height - 1):
             self._contents_console.pop(0)
@@ -254,14 +271,58 @@ class Bui:
 
         return result
 
+    def _gradient_red_green(self, percent):
+        if percent > 100 or percent < 0:
+            red = 0
+            green = 0
+            blue = 100
+        else:
+            red = 2 * (100 - percent)
+            green = 2 * percent
+            blue = 0
+        if self.term.does_styling:
+            return self.term.color_rgb(red, green, blue)
+        else:
+            return self.default_style
+
+    def progress_bar(self, title, iteration, total, low_latency=False, bar_length=50):
+        if self._skip_iteration(low_latency):
+            return
+
+        if (bar_length + 6) > self.width:
+            bar_length = self.width - 6
+        bar_left_extent = (self.width // 2) - ((bar_length + 2) // 2)
+        bar_upward_extent = self.height // 2
+        title_left_extent = (self.width // 2) - ((len(title) + 2) // 2)
+        try:
+            percent = int(round((iteration / total) * 100))
+            fill_len = int(round((bar_length * percent) / 100))
+            bar_fill = '█' * fill_len
+            bar_empty = ' ' * (bar_length - fill_len)
+            progress_bar = f"{self.warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self.warn_style}]{self.default_style}"
+            self.print(f"{title}", title_left_extent, bar_upward_extent - 1)
+            for offset in range(0, 3):
+                if offset == 1:
+                    suffix = f" {percent}%"
+                else:
+                    suffix = ""
+                self.print(f"{progress_bar}{suffix}", bar_left_extent, bar_upward_extent + offset)
+        except ZeroDivisionError:
+            pass
+
     def ask_yn(self):
         pass
 
 if __name__ == "__main__":
     ui = Bui()
     ui.clear()
+    for perc in range(0, 100, 2):
+        ui.progress_bar("This is the title of a bar", perc, 100)
+        perc
+    exit()
     for thing in range(0, 40):
         ui.console(f"{thing}{thing}")
+
     ui.console("second to last line")
     ui.console("final line here")
 
