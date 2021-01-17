@@ -285,7 +285,7 @@ class Bui:
         else:
             return self.default_style
 
-    def progress_bar(self, title, iteration, total, low_latency=False, bar_length=50):
+    def load_bar(self, title, iteration, total, low_latency=False, bar_length=50):
         if self._skip_iteration(low_latency):
             return
 
@@ -317,7 +317,7 @@ if __name__ == "__main__":
     ui = Bui()
     ui.clear()
     for perc in range(0, 100, 2):
-        ui.progress_bar("This is the title of a bar", perc, 100)
+        ui.load_bar("This is the title of a bar", perc, 100)
         perc
     exit()
     for thing in range(0, 40):
