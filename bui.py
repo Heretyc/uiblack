@@ -1,5 +1,6 @@
 from blessed import Terminal
 import re
+import datetime
 
 class Bui:
     def __init__(self):
@@ -21,6 +22,13 @@ class Bui:
         self.warn_style = f"{self.term.normal}{self.term.yellow}{self.warn_bg}"
 
         self._contents_console = []
+
+    def _get_time_string(self):
+        now = datetime.datetime.now()
+        if self.term.does_styling:
+            return f"{self.term.olivedrab}[{self.term.turquoise}{now.strftime('%H:%M')}{self.term.olivedrab}]{self.default_style} "
+        else:
+            return f"[{now.strftime('%H:%M')}] "
 
     def print(self, text, right=None, down=None):
         if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
@@ -57,15 +65,33 @@ class Bui:
             self.print(f"{self._contents_console[index]}{pad}", 0, (self.height - 3) - inverse_index)
             inverse_index += 1
 
+    def notice(self, text):
+        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+            self.console(f"{self._get_time_string()}{self.default_style}{text}{self.default_style}")
+        else:
+            print(f"{self._get_time_string()}{text}")
+
     def error(self, text):
         if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            print(f"{self.error_style}{text}")
+            self.console(f"{self._get_time_string()}{self.error_style}{text}{self.default_style}")
         else:
-            print(text)
+            print(f"{self._get_time_string()}{text}")
 
     def warn(self, text):
         if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            print(f"{self.warn_style}{text}")
+            self.console(f"{self._get_time_string()}{self.warn_style}{text}{self.default_style}")
+        else:
+            print(f"{self._get_time_string()}{text}")
+
+    def print_error(self, text):
+        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+            print(f"{self.error_style}{text}{self.default_style}")
+        else:
+            print(text)
+
+    def print_warn(self, text):
+        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+            print(f"{self.warn_style}{text}{self.default_style}")
         else:
             print(text)
 
@@ -257,6 +283,7 @@ if __name__ == "__main__":
     ui.print_center("this is just a test of things")
     ui.warn("warning here")
     ui.error("error here")
+    ui.notice("Just a notice")
     ui.console("final line here")
     ui.quit()
     ui
