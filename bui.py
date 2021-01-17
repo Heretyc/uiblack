@@ -20,6 +20,8 @@ class Bui:
         self.error_style = f"{self.term.normal}{self.term.red}{self.error_bg}"
         self.warn_style = f"{self.term.normal}{self.term.yellow}{self.warn_bg}"
 
+        self._contents_console = []
+
     def print(self, text, right=None, down=None):
         if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
             if (down is not None) and (right is not None):
@@ -37,6 +39,23 @@ class Bui:
                 print(f"{self.default_style}{text}")
         else:
             print(text)
+
+    def _clear_console(self):
+        total = self.width
+        bar = " " * total
+        for row in range(1, self.height):
+            self.print(bar, 0, row)
+
+    def console(self, text):
+        self._contents_console.append(text)
+        if len(self._contents_console) >= (self.height - 1):
+            self._contents_console.pop(0)
+
+        inverse_index = 0
+        for index in range(len(self._contents_console) - 1, 0, -1):
+            pad = " " * (self.width - len(self._contents_console[index]))
+            self.print(f"{self._contents_console[index]}{pad}", 0, (self.height - 3) - inverse_index)
+            inverse_index += 1
 
     def error(self, text):
         if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
@@ -225,6 +244,11 @@ class Bui:
 if __name__ == "__main__":
     ui = Bui()
     ui.clear()
+    for thing in range(0, 40):
+        ui.console(f"{thing}{thing}")
+    ui.console("second to last line")
+    ui.console("final line here")
+
     ui.set_main_title("this is a test title")
     result = ui.ask_list("Question text goes here", ["first item here", "this is the second item", "and this is the third"])
     ui.print(f"{ui.bold(result)}")
@@ -233,5 +257,6 @@ if __name__ == "__main__":
     ui.print_center("this is just a test of things")
     ui.warn("warning here")
     ui.error("error here")
+    ui.console("final line here")
     ui.quit()
     ui
