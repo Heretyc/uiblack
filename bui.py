@@ -4,8 +4,8 @@ import datetime
 
 class Bui:
     def __init__(self):
-        self.title = None
-        self.pattern_text = re.compile('([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+')
+        self._title = None
+        self._pattern_text = re.compile('([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+')
         self.term = Terminal()
         self.term.enter_fullscreen
         self.height = self.term.height
@@ -82,18 +82,6 @@ class Bui:
             self.console(f"{self._get_time_string()}{self.warn_style}{text}{self.default_style}")
         else:
             print(f"{self._get_time_string()}{text}")
-
-    def print_error(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            print(f"{self.error_style}{text}{self.default_style}")
-        else:
-            print(text)
-
-    def print_warn(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            print(f"{self.warn_style}{text}{self.default_style}")
-        else:
-            print(text)
 
     def print_center(self, text, style=None, corner=None):
         if style is None:
@@ -178,7 +166,7 @@ class Bui:
             while True:
                 val = ''
                 val = self.term.inkey()
-                found = self.pattern_text.match(val)
+                found = self._pattern_text.match(val)
                 if val.name == 'KEY_ENTER':
                     break
                 elif val.is_sequence:
@@ -199,6 +187,8 @@ class Bui:
                         self.print("*" * len(result), input_offset, input_height)
                     else:
                         self.print(result, input_offset, input_height)
+        self.print(f"{' ' * self.width}", 0, input_height - 1)
+        self.print(f"{' ' * self.width}", 0, input_height)
 
         return result
 
@@ -208,21 +198,21 @@ class Bui:
     def _display_main_title(self):
         if not self.term.does_styling:
             return
-        if self.title is None:
+        if self._title is None:
             return
-        center_text = len(self.title) // 2
+        center_text = len(self._title) // 2
         center_screen = self.width // 2
         final_location = center_screen - center_text
         location_tuple = self.term.get_location()
         if location_tuple[0] < 1:
             print("")  # Moving the console cursor down by one to prevent overwriting title
         self.print(self.window_text(f"{' ' * self.width}"), 0, 0)
-        self.print(self.window_text(self.title), final_location, 0)
+        self.print(self.window_text(self._title), final_location, 0)
 
     def set_main_title(self, new_title):
         if new_title is not None:
             new_title = new_title[0:self.width]  # Truncate titles to the length of the terminal window
-        self.title = new_title
+        self._title = new_title
         self._display_main_title()
 
     def ask_list(self, question, menu_list):
