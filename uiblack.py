@@ -2,10 +2,33 @@ from blessed import Terminal
 import re
 import datetime
 
-class Bui:
+"""uiblack.py: Streamlined cross-platform Textual UI"""
+
+__author__ = "Brandon Blackburn"
+__maintainer__ = "Brandon Blackburn"
+__email__ = "contact@bhax.net"
+__website__ = "https://keybase.io/blackburnhax"
+__copyright__ = "Copyright 2021Brandon Blackburn"
+__license__ = "Apache 2.0"
+
+#  Copyright (c) 2021. Brandon Blackburn - https://keybase.io/blackburnhax, Apache License, Version 2.0.
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  http://www.apache.org/licenses/LICENSE-2.0
+#  Unless required by applicable law or agreed to in writing,
+#  software distributed under the License is distributed on an
+#  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+#  either express or implied. See the License for the specific
+#  language governing permissions and limitations under the License.
+#  TL;DR:
+#  For a human-readable & fast explanation of the Apache 2.0 license visit:  http://www.tldrlegal.com/l/apache2
+
+
+class UIBlack:
     def __init__(self):
         self._title = None
-        self._pattern_text = re.compile('([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+')
+        self._pattern_text = re.compile("([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+")
 
         self._low_latency_index = 0
         self._low_latency_max = 100
@@ -28,8 +51,9 @@ class Bui:
         self._contents_console = []
 
     def _skip_iteration(self, is_low_latency_enabled):
+        # Low latency was set, have we hit max?
         if is_low_latency_enabled:
-            if  self._low_latency_index >= self._low_latency_max:  # Low latency was set, have we hit max?
+            if self._low_latency_index >= self._low_latency_max:
                 # We hit the max, so run this iteration and reset index
                 self._low_latency_index = 0
                 return False
@@ -46,7 +70,8 @@ class Bui:
             return f"[{now.strftime('%H:%M')}] "
 
     def print(self, text, right=None, down=None):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
             if (down is not None) and (right is not None):
                 if down > self.height:
                     down = self.height
@@ -57,7 +82,10 @@ class Bui:
                 if down < 0:
                     down = 0
                 with self.term.location():
-                    print(self.term.move(down, right) + f"{self.default_style}{text}", end='')
+                    print(
+                        self.term.move(down, right) + f"{self.default_style}{text}",
+                        end="",
+                    )
             else:
                 print(f"{self.default_style}{text}")
         else:
@@ -79,24 +107,37 @@ class Bui:
         inverse_index = 0
         for index in range(len(self._contents_console) - 1, 0, -1):
             pad = " " * (self.width - len(self._contents_console[index]))
-            self.print(f"{self._contents_console[index]}{pad}", 0, (self.height - 3) - inverse_index)
+            self.print(
+                f"{self._contents_console[index]}{pad}",
+                0,
+                (self.height - 3) - inverse_index,
+            )
             inverse_index += 1
 
     def notice(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            self.console(f"{self._get_time_string()}{self.default_style}{text}{self.default_style}")
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
+            self.console(
+                f"{self._get_time_string()}{self.default_style}{text}{self.default_style}"
+            )
         else:
             print(f"{self._get_time_string()}{text}")
 
     def error(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            self.console(f"{self._get_time_string()}{self.error_style}{text}{self.default_style}")
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
+            self.console(
+                f"{self._get_time_string()}{self.error_style}{text}{self.default_style}"
+            )
         else:
             print(f"{self._get_time_string()}{text}")
 
     def warn(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
-            self.console(f"{self._get_time_string()}{self.warn_style}{text}{self.default_style}")
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
+            self.console(
+                f"{self._get_time_string()}{self.warn_style}{text}{self.default_style}"
+            )
         else:
             print(f"{self._get_time_string()}{text}")
 
@@ -141,19 +182,22 @@ class Bui:
         self.print_center(text, self.warn_style, "*")
 
     def bold(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
             return f"{self.term.bold}{text}{self.default_style}"
         else:
             return f"{text}"
 
     def window_text(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
             return f"{self.window_style}{text}{self.default_style}"
         else:
             return f"{text}"
 
     def underline(self, text):
-        if self.term.does_styling:  # Check if output is going into a pipe or other unformatted output
+        # Check if output is going into a pipe or other unformatted output
+        if self.term.does_styling:
             return f"{self.term.underline}{text}{self.term.no_underline}"
         else:
             return f"{text}"
@@ -173,7 +217,8 @@ class Bui:
         if question is None:
             question = "Press [Enter] to continue:"
         else:
-            question[0:self.width - input_offset]  # Truncate questions to the length of the terminal window
+            # Truncate questions to the length of the terminal window
+            question = question[0 : self.width - input_offset]
         self.print(f"{question}", input_offset, input_height - 1)
 
         if max_len is None:
@@ -181,14 +226,14 @@ class Bui:
         result = ""
         with self.term.cbreak():
             while True:
-                val = ''
+                val = ""
                 val = self.term.inkey()
                 found = self._pattern_text.match(val)
-                if val.name == 'KEY_ENTER':
+                if val.name == "KEY_ENTER":
                     break
                 elif val.is_sequence:
                     print("got sequence: {0}.".format((str(val), val.name, val.code)))
-                elif val.name == 'KEY_BACKSPACE' or val.name == 'KEY_DELETE':
+                elif val.name == "KEY_BACKSPACE" or val.name == "KEY_DELETE":
                     self.print(" " * len(result), input_offset, input_height)
                     result = result[:-1]
                     if obfuscate:
@@ -222,13 +267,15 @@ class Bui:
         final_location = center_screen - center_text
         location_tuple = self.term.get_location()
         if location_tuple[0] < 1:
-            print("")  # Moving the console cursor down by one to prevent overwriting title
+            print("")
+            # Moving the console cursor down by one to prevent overwriting title
         self.print(self.window_text(f"{' ' * self.width}"), 0, 0)
         self.print(self.window_text(self._title), final_location, 0)
 
     def set_main_title(self, new_title):
         if new_title is not None:
-            new_title = new_title[0:self.width]  # Truncate titles to the length of the terminal window
+            # Truncate titles to the length of the terminal window
+            new_title = new_title[0 : self.width]
         self._title = new_title
         self._display_main_title()
 
@@ -236,8 +283,8 @@ class Bui:
         menu_height = self.height // 2
         menu_offset = self.width // 2
         menu_top = menu_height - (len(menu_list) + 1)
-
-        question[0:self.width - 2]  # Truncate questions to the length of the terminal window
+        # Truncate questions to the length of the terminal window
+        question = question[0 : self.width - 2]
         self.print(f"{question}", (menu_offset - len(question)), menu_top - 2)
 
         index = 0
@@ -250,24 +297,30 @@ class Bui:
         index_max = len(menu_list) - 1
         with self.term.cbreak():
             while True:
-                self.print(f"{self.term.reverse}{menu_list[index]}", menu_offset, (menu_top + (index * 2)))
+                self.print(
+                    f"{self.term.reverse}{menu_list[index]}",
+                    menu_offset,
+                    (menu_top + (index * 2)),
+                )
                 val = self.term.inkey()
-                if val.name == 'KEY_ENTER':
+                if val.name == "KEY_ENTER":
                     break
-                elif val.name == 'KEY_UP':
-                    self.print(f"{menu_list[index]}", menu_offset, (menu_top + (index * 2)))
+                elif val.name == "KEY_UP":
+                    self.print(
+                        f"{menu_list[index]}", menu_offset, (menu_top + (index * 2))
+                    )
                     index -= 1
                     if index < 0:
                         index = index_max
-                elif val.name == 'KEY_DOWN':
-                    self.print(f"{menu_list[index]}", menu_offset, (menu_top + (index * 2)))
+                elif val.name == "KEY_DOWN":
+                    self.print(
+                        f"{menu_list[index]}", menu_offset, (menu_top + (index * 2))
+                    )
                     index += 1
                     if index > index_max:
                         index = 0
 
         return menu_list[index]
-
-
 
         return result
 
@@ -297,8 +350,8 @@ class Bui:
         try:
             percent = int(round((iteration / total) * 100))
             fill_len = int(round((bar_length * percent) / 100))
-            bar_fill = '█' * fill_len
-            bar_empty = ' ' * (bar_length - fill_len)
+            bar_fill = "█" * fill_len
+            bar_empty = " " * (bar_length - fill_len)
             progress_bar = f"{self.warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self.warn_style}]{self.default_style}"
             self.print(f"{title}", title_left_extent, bar_upward_extent - 1)
             for offset in range(0, 3):
@@ -306,15 +359,20 @@ class Bui:
                     suffix = f" {percent}%"
                 else:
                     suffix = ""
-                self.print(f"{progress_bar}{suffix}", bar_left_extent, bar_upward_extent + offset)
+                self.print(
+                    f"{progress_bar}{suffix}",
+                    bar_left_extent,
+                    bar_upward_extent + offset,
+                )
         except ZeroDivisionError:
             pass
 
     def ask_yn(self):
         pass
 
+
 if __name__ == "__main__":
-    ui = Bui()
+    ui = UIBlack()
     ui.clear()
     for perc in range(0, 100, 2):
         ui.load_bar("This is the title of a bar", perc, 100)
@@ -327,7 +385,10 @@ if __name__ == "__main__":
     ui.console("final line here")
 
     ui.set_main_title("this is a test title")
-    result = ui.ask_list("Question text goes here", ["first item here", "this is the second item", "and this is the third"])
+    result = ui.ask_list(
+        "Question text goes here",
+        ["first item here", "this is the second item", "and this is the third"],
+    )
     ui.print(f"{ui.bold(result)}")
     results = ui.input("This is a question")
     ui.print(f"{ui.bold('some text')} {results}")
