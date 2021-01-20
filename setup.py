@@ -1,20 +1,28 @@
-import pathlib
-from distutils.core import setup
+import os.path
+from setuptools import setup
 
-HERE = pathlib.Path(__file__).parent
+HERE = os.path.abspath(os.path.dirname(__file__))
 
-README = (HERE / "README.md").read_text()
+with open(os.path.join(HERE, "README.md")) as fid:
+    README = fid.read()
 
 setup(
     name="uiblack",
     version="1.0.0",
-    packages=["uiblack"],
-    url="https://github.com/BlackburnHax/uiblack",
-    license="Apache 2.0",
-    author="Brandon Blackburn",
-    author_email="contact@bhax.net",
     description="Streamlined cross-platform Textual UI",
     long_description=README,
     long_description_content_type="text/markdown",
-    install_requires=["blessed"],
+    url="https://github.com/BlackburnHax/uiblack",
+    author="Brandon Blackburn",
+    author_email="contact@bhax.net",
+    license="Apache 2.0",
+    classifiers=[
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    packages=["uiblack"],
+    include_package_data=True,
+    install_requires=[
+        "blessed"
+    ]
 )

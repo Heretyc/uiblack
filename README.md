@@ -54,4 +54,8 @@ Brandon Blackburn – [PGP Encrypted Chat @ Keybase](https://keybase.io/blackbur
 
 Distributed under the Apache 2.0 license. See ``LICENSE`` for more information.
 
+_TL;DR:_
+For a human-readable & fast explanation of the Apache 2.0 license visit:  http://www.tldrlegal.com/l/apache2
+
+
 [https://github.com/BlackburnHax/uiblack](https://github.com/BlackburnHax/uiblack)
