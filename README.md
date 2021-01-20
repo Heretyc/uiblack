@@ -18,7 +18,7 @@ pip install uiblack
 
 Keep it simple. Just import, instance the library, and use it!
 ```python
-import uiblack
+from uiblack import UIBlack
 ui = UIBlack()
 ui.clear()
 
