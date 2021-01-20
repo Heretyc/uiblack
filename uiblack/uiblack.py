@@ -8,7 +8,7 @@ __author__ = "Brandon Blackburn"
 __maintainer__ = "Brandon Blackburn"
 __email__ = "contact@bhax.net"
 __website__ = "https://keybase.io/blackburnhax"
-__copyright__ = "Copyright 2021Brandon Blackburn"
+__copyright__ = "Copyright 2021 Brandon Blackburn"
 __license__ = "Apache 2.0"
 
 #  Copyright (c) 2021. Brandon Blackburn - https://keybase.io/blackburnhax, Apache License, Version 2.0.
@@ -164,16 +164,16 @@ class UIBlack:
 
         with self.term.location(left_side + 3, top_side + 2):
             self.print(f"{style}{text}")
-
-        if corner != " ":
-            with self.term.location(left_side, top_side):
-                self.print(f"{style}{corner}")
-            with self.term.location(right_side, top_side):
-                self.print(f"{style}{corner}")
-            with self.term.location(left_side, bottom_side):
-                self.print(f"{style}{corner}")
-            with self.term.location(right_side, bottom_side):
-                self.print(f"{style}{corner}")
+        if self.term.does_styling:
+            if corner != " ":
+                with self.term.location(left_side, top_side):
+                    self.print(f"{style}{corner}")
+                with self.term.location(right_side, top_side):
+                    self.print(f"{style}{corner}")
+                with self.term.location(left_side, bottom_side):
+                    self.print(f"{style}{corner}")
+                with self.term.location(right_side, bottom_side):
+                    self.print(f"{style}{corner}")
 
     def error_center(self, text):
         self.print_center(text, self.error_style, "!")
@@ -253,9 +253,6 @@ class UIBlack:
         self.print(f"{' ' * self.width}", 0, input_height)
 
         return result
-
-    def message(self, text, title=""):
-        pass
 
     def _display_main_title(self):
         if not self.term.does_styling:
@@ -367,35 +364,41 @@ class UIBlack:
         except ZeroDivisionError:
             pass
 
-    def ask_yn(self):
-        pass
+    def ask_yn(self, question, default_response=False):
+        menu_height = self.height // 2
+        menu_offset = self.width // 2
+        no_offset = menu_offset + 8
+        yes_offset = menu_offset - 8
+        menu_top = menu_height - 1
+        # Truncate questions to the length of the terminal window
+        question = question[0 : self.width - 2]
+        self.print(f"{question}", (menu_offset - (len(question) // 2)), menu_top - 2)
+
+        self.print("YES", yes_offset, menu_height)
+        self.print("NO", no_offset, menu_height)
+
+        index = default_response
+        with self.term.cbreak():
+            while True:
+                if index:
+                    self.print(f"{self.term.reverse}YES", yes_offset, menu_height)
+                    self.print(f"{self.term.default}NO", no_offset, menu_height)
+                else:
+                    self.print(f"{self.term.default}YES", yes_offset, menu_height)
+                    self.print(f"{self.term.reverse}NO", no_offset, menu_height)
+                val = self.term.inkey()
+                if val.name == "KEY_ENTER":
+                    break
+                elif val.name == "KEY_RIGHT" or val == "n":
+                    index = False
+                elif val.name == "KEY_LEFT" or val == "y":
+                    index = True
+
+        return index
 
 
 if __name__ == "__main__":
     ui = UIBlack()
     ui.clear()
-    for perc in range(0, 100, 2):
-        ui.load_bar("This is the title of a bar", perc, 100)
-        perc
-    exit()
-    for thing in range(0, 40):
-        ui.console(f"{thing}{thing}")
-
-    ui.console("second to last line")
-    ui.console("final line here")
-
-    ui.set_main_title("this is a test title")
-    result = ui.ask_list(
-        "Question text goes here",
-        ["first item here", "this is the second item", "and this is the third"],
-    )
-    ui.print(f"{ui.bold(result)}")
-    results = ui.input("This is a question")
-    ui.print(f"{ui.bold('some text')} {results}")
-    ui.print_center("this is just a test of things")
-    ui.warn("warning here")
-    ui.error("error here")
-    ui.notice("Just a notice")
-    ui.console("final line here")
-    ui.quit()
-    ui
+    ui.error_center("UIBlack should not be run directly.")
+    exit(1)
