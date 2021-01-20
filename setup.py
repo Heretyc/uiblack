@@ -7,7 +7,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="uiblack",
-    version="1.0",
+    version="1.0.0",
     packages=["uiblack"],
     url="https://github.com/BlackburnHax/uiblack",
     license="Apache 2.0",
