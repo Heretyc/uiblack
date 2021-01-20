@@ -25,7 +25,7 @@ __license__ = "Apache 2.0"
 #  For a human-readable & fast explanation of the Apache 2.0 license visit:  http://www.tldrlegal.com/l/apache2
 
 
-class UIBlack:
+class UIBlackTerminal:
     def __init__(self):
         self._title = None
         self._pattern_text = re.compile("([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+")
@@ -48,6 +48,8 @@ class UIBlack:
         self.error_style = f"{self.term.normal}{self.term.red}{self.error_bg}"
         self.warn_style = f"{self.term.normal}{self.term.yellow}{self.warn_bg}"
 
+        self.update_counter_interval = 100
+        self._update_counter = 0
         self._contents_console = []
 
     def _skip_iteration(self, is_low_latency_enabled):
@@ -61,6 +63,15 @@ class UIBlack:
                 self._low_latency_index += 1  # Have not hit max, so increment
                 return True  # and skip this execution
         return False
+
+    def _check_update(self):
+        self._update_counter += 1
+        if self._update_counter >= self.update_counter_interval:
+            self._update_counter = 0
+            self.width = self.term.width
+            self.height = self.term.height
+            self.clear()
+            self._display_main_title()
 
     def _get_time_string(self):
         now = datetime.datetime.now()
@@ -101,6 +112,7 @@ class UIBlack:
         if self._skip_iteration(low_latency):
             return
         self._contents_console.append(text)
+        self._check_update()
         if len(self._contents_console) >= (self.height - 1):
             self._contents_console.pop(0)
 
@@ -122,6 +134,9 @@ class UIBlack:
             )
         else:
             print(f"{self._get_time_string()}{text}")
+
+    def info(self, *args):
+        self.notice(*args)
 
     def error(self, text):
         # Check if output is going into a pipe or other unformatted output
@@ -398,7 +413,7 @@ class UIBlack:
 
 
 if __name__ == "__main__":
-    ui = UIBlack()
+    ui = UIBlackTerminal()
     ui.clear()
     ui.error_center("UIBlack should not be run directly.")
     exit(1)

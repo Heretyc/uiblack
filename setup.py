@@ -8,7 +8,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name="uiblack",
-    version="1.0.1",
+    version="1.0.5",
     description="Streamlined cross-platform Textual UI",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -22,7 +22,5 @@ setup(
     ],
     packages=["uiblack"],
     include_package_data=True,
-    install_requires=[
-        "blessed"
-    ]
+    install_requires=["blessed"],
 )

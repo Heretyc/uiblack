@@ -17,9 +17,11 @@ pip install uiblack
 ## Usage examples
 
 Keep it simple. Just import, instance the library, and use it!
+
 ```python
-from uiblack import UIBlack
-ui = UIBlack()
+from uiblack.terminal import UIBlackTerminal
+
+ui = UIBlackTerminal()
 ui.clear()
 
 result = ui.ask_yn("This is the question?")
@@ -34,10 +36,10 @@ for thing in range(0, 40):
 ui.set_main_title("this is a test title")
 
 result = ui.ask_list("Question text goes here",
-    ["first item here", 
-     "this is the second item", 
-     "and this is the third"],
-)
+                     ["first item here",
+                      "this is the second item",
+                      "and this is the third"],
+                     )
 
 ui.warn("warning here")
 ui.error("error here")
