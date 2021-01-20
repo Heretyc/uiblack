@@ -35,8 +35,6 @@ class UIBlackTerminal:
 
         self.term = Terminal()
         self.term.enter_fullscreen
-        self.height = self.term.height
-        self.width = self.term.width
 
         self.default_bg = f"{self.term.on_black}"
         self.window_bg = f"{self.term.reverse}"
@@ -68,8 +66,6 @@ class UIBlackTerminal:
         self._update_counter += 1
         if self._update_counter >= self.update_counter_interval:
             self._update_counter = 0
-            self.width = self.term.width
-            self.height = self.term.height
             self.clear()
             self._display_main_title()
 
@@ -84,10 +80,10 @@ class UIBlackTerminal:
         # Check if output is going into a pipe or other unformatted output
         if self.term.does_styling:
             if (down is not None) and (right is not None):
-                if down > self.height:
-                    down = self.height
-                if right > self.width + len(text):
-                    right = self.width - len(text)
+                if down > self.term.height:
+                    down = self.term.height
+                if right > self.term.width + len(text):
+                    right = self.term.width - len(text)
                 if right < 0:
                     right = 0
                 if down < 0:
@@ -103,9 +99,9 @@ class UIBlackTerminal:
             print(text)
 
     def _clear_console(self):
-        total = self.width
+        total = self.term.width
         bar = " " * total
-        for row in range(1, self.height):
+        for row in range(1, self.term.height):
             self.print(bar, 0, row)
 
     def console(self, text, low_latency=False):
@@ -113,16 +109,16 @@ class UIBlackTerminal:
             return
         self._contents_console.append(text)
         self._check_update()
-        if len(self._contents_console) >= (self.height - 1):
+        if len(self._contents_console) >= (self.term.height - 1):
             self._contents_console.pop(0)
 
         inverse_index = 0
         for index in range(len(self._contents_console) - 1, 0, -1):
-            pad = " " * (self.width - len(self._contents_console[index]))
+            pad = " " * (self.term.width - len(self._contents_console[index]))
             self.print(
                 f"{self._contents_console[index]}{pad}",
                 0,
-                (self.height - 3) - inverse_index,
+                (self.term.height - 3) - inverse_index,
             )
             inverse_index += 1
 
@@ -165,10 +161,10 @@ class UIBlackTerminal:
         center_text = len(text) // 2
         bar = ""
 
-        left_side = (self.width // 2) - (center_text + 4)
-        right_side = (self.width // 2) + (center_text + 2)
-        top_side = (self.height // 2) - 2
-        bottom_side = (self.height // 2) + 2
+        left_side = (self.term.width // 2) - (center_text + 4)
+        right_side = (self.term.width // 2) + (center_text + 2)
+        top_side = (self.term.height // 2) - 2
+        bottom_side = (self.term.height // 2) + 2
 
         for _ in range(0, (len(text) + 6)):
             bar = f"{style}{bar} "
@@ -226,18 +222,18 @@ class UIBlackTerminal:
         self.term.exit_fullscreen
 
     def input(self, question=None, obfuscate=False, max_len=None):
-        input_height = self.height - 1
+        input_height = self.term.height - 1
         input_offset = 2
 
         if question is None:
             question = "Press [Enter] to continue:"
         else:
             # Truncate questions to the length of the terminal window
-            question = question[0 : self.width - input_offset]
+            question = question[0 : self.term.width - input_offset]
         self.print(f"{question}", input_offset, input_height - 1)
 
         if max_len is None:
-            max_len = self.width - 3
+            max_len = self.term.width - 3
         result = ""
         with self.term.cbreak():
             while True:
@@ -264,8 +260,8 @@ class UIBlackTerminal:
                         self.print("*" * len(result), input_offset, input_height)
                     else:
                         self.print(result, input_offset, input_height)
-        self.print(f"{' ' * self.width}", 0, input_height - 1)
-        self.print(f"{' ' * self.width}", 0, input_height)
+        self.print(f"{' ' * self.term.width}", 0, input_height - 1)
+        self.print(f"{' ' * self.term.width}", 0, input_height)
 
         return result
 
@@ -275,28 +271,28 @@ class UIBlackTerminal:
         if self._title is None:
             return
         center_text = len(self._title) // 2
-        center_screen = self.width // 2
+        center_screen = self.term.width // 2
         final_location = center_screen - center_text
         location_tuple = self.term.get_location()
         if location_tuple[0] < 1:
             print("")
             # Moving the console cursor down by one to prevent overwriting title
-        self.print(self.window_text(f"{' ' * self.width}"), 0, 0)
+        self.print(self.window_text(f"{' ' * self.term.width}"), 0, 0)
         self.print(self.window_text(self._title), final_location, 0)
 
     def set_main_title(self, new_title):
         if new_title is not None:
             # Truncate titles to the length of the terminal window
-            new_title = new_title[0 : self.width]
+            new_title = new_title[0 : self.term.width]
         self._title = new_title
         self._display_main_title()
 
     def ask_list(self, question, menu_list):
-        menu_height = self.height // 2
-        menu_offset = self.width // 2
+        menu_height = self.term.height // 2
+        menu_offset = self.term.width // 2
         menu_top = menu_height - (len(menu_list) + 1)
         # Truncate questions to the length of the terminal window
-        question = question[0 : self.width - 2]
+        question = question[0 : self.term.width - 2]
         self.print(f"{question}", (menu_offset - len(question)), menu_top - 2)
 
         index = 0
@@ -354,11 +350,11 @@ class UIBlackTerminal:
         if self._skip_iteration(low_latency):
             return
 
-        if (bar_length + 6) > self.width:
-            bar_length = self.width - 6
-        bar_left_extent = (self.width // 2) - ((bar_length + 2) // 2)
-        bar_upward_extent = self.height // 2
-        title_left_extent = (self.width // 2) - ((len(title) + 2) // 2)
+        if (bar_length + 6) > self.term.width:
+            bar_length = self.term.width - 6
+        bar_left_extent = (self.term.width // 2) - ((bar_length + 2) // 2)
+        bar_upward_extent = self.term.height // 2
+        title_left_extent = (self.term.width // 2) - ((len(title) + 2) // 2)
         try:
             percent = int(round((iteration / total) * 100))
             fill_len = int(round((bar_length * percent) / 100))
@@ -380,13 +376,13 @@ class UIBlackTerminal:
             pass
 
     def ask_yn(self, question, default_response=False):
-        menu_height = self.height // 2
-        menu_offset = self.width // 2
+        menu_height = self.term.height // 2
+        menu_offset = self.term.width // 2
         no_offset = menu_offset + 8
         yes_offset = menu_offset - 8
         menu_top = menu_height - 1
         # Truncate questions to the length of the terminal window
-        question = question[0 : self.width - 2]
+        question = question[0 : self.term.width - 2]
         self.print(f"{question}", (menu_offset - (len(question) // 2)), menu_top - 2)
 
         self.print("YES", yes_offset, menu_height)
