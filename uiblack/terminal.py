@@ -48,7 +48,10 @@ class UIBlackTerminal:
 
         self.update_counter_interval = 100
         self._update_counter = 0
+        self.console_scrollback = 500
         self._contents_console = []
+        self._previous_height = self.term.height
+        self._previous_width = self.term.width
 
     def _skip_iteration(self, is_low_latency_enabled):
         # Low latency was set, have we hit max?
@@ -64,7 +67,14 @@ class UIBlackTerminal:
 
     def _check_update(self):
         self._update_counter += 1
-        if self._update_counter >= self.update_counter_interval:
+        previous_total = self._previous_height + self._previous_width
+        current_total = self.term.height + self.term.width
+        if (
+            self._update_counter >= self.update_counter_interval
+            or current_total != previous_total
+        ):
+            self._previous_height = self.term.height
+            self._previous_width = self.term.width
             self._update_counter = 0
             self.clear()
             self._display_main_title()
@@ -99,21 +109,25 @@ class UIBlackTerminal:
             print(text)
 
     def _clear_console(self):
-        total = self.term.width
-        bar = " " * total
+        bar = " " * self.term.width
         for row in range(1, self.term.height):
             self.print(bar, 0, row)
 
     def console(self, text, low_latency=False):
+        self._contents_console.append(text)
+        while len(self._contents_console) >= self.console_scrollback:
+            self._contents_console.pop(0)
         if self._skip_iteration(low_latency):
             return
-        self._contents_console.append(text)
         self._check_update()
-        if len(self._contents_console) >= (self.term.height - 1):
-            self._contents_console.pop(0)
-
         inverse_index = 0
         for index in range(len(self._contents_console) - 1, 0, -1):
+            if self._title is None:
+                if ((self.term.height - 3) - inverse_index) < 0:
+                    break
+            else:
+                if ((self.term.height - 3) - inverse_index) < 1:
+                    break
             pad = " " * (self.term.width - len(self._contents_console[index]))
             self.print(
                 f"{self._contents_console[index]}{pad}",
@@ -153,6 +167,7 @@ class UIBlackTerminal:
             print(f"{self._get_time_string()}{text}")
 
     def print_center(self, text, style=None, corner=None):
+        self._check_update()
         if style is None:
             style = self.default_style
         if corner is None:
@@ -216,7 +231,7 @@ class UIBlackTerminal:
     def clear(self):
         if self.term.does_styling:
             print(self.term.clear())
-        self._display_main_title()
+            self._display_main_title()
 
     def quit(self):
         self.term.exit_fullscreen
