@@ -15,7 +15,7 @@ pip install uiblack
 ```
 
 
-### Logging
+## Logging
 To keep things simple and cross-platform, logs are generated in the eecution directory. (This particular behavior may be subject to change in future builds.)
 
 By default, [INFO] level messages are logged.
@@ -39,6 +39,29 @@ log_level = 4
 
 ui = UIBlackTerminal(log_name, restart_log, log_level)
 ```
+## Error handling
+If you want to wrap a troublesome function or your entire program in a exception handler that correctly prints to the screen and logs, just add some "pie"!
+
+### This process:
+- Catches all exceptions
+- Formats them into a single line
+- Keeps only the last segment of the traceback (the part we actually care about)
+- Prints correctly to the virtual UIBlack console
+- Logs the event WITH traceback in the log file under a single human-readable line
+```python
+from uiblack.terminal import UIBlackTerminal
+
+ui = UIBlackTerminal()
+
+@ui.wrapper  # Notice the function is wrapped using "pie" syntax before each function
+def troublesome_func():
+    raise KeyError
+
+@ui.wrapper
+def some_other_func(param):
+    raise ImportError
+```
+
 ## Usage examples
 
 Keep it simple. Just import, instance the library, and use it!

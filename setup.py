@@ -8,7 +8,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
 
 setup(
     name="uiblack",
-    version="1.1.0",
+    version="1.1.1",
     description="Streamlined cross-platform Textual UI",
     long_description=README,
     long_description_content_type="text/markdown",

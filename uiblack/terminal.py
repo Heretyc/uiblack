@@ -2,6 +2,7 @@ from blessed import Terminal
 import re
 import datetime
 import logging
+import traceback
 
 """uiblack.py: Streamlined cross-platform Textual UI"""
 
@@ -528,6 +529,32 @@ class UIBlackTerminal:
                     index = True
 
         return index
+
+    def wrapper(self, func):
+        """
+        Use the following example in your own code:
+        from uiblack.terminal import UIBlackTerminal
+        ui = UIBlackTerminal()
+
+        @ui.wrapper  # Notice the function is wrapped using "pie" syntax before each function
+        def badfunc():
+            raise KeyError
+
+        :param func: function object
+        :type func: object
+        :return: wrapped function call, safe from exceptions, but all of them logged
+        """
+
+        def function_wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                trace = traceback.format_exc(limit=-1).replace("\n", " >> ")
+                self.error(f"Exception: {trace}")
+                # Yes, I could have used self_logger.exception(), but this way ensures a single line output on the log
+                self._logger.error(f"Exception: {trace}")
+
+        return function_wrapper
 
 
 if __name__ == "__main__":
