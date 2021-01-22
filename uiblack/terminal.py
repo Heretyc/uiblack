@@ -1,6 +1,7 @@
 from blessed import Terminal
 import re
 import datetime
+import logging
 
 """uiblack.py: Streamlined cross-platform Textual UI"""
 
@@ -26,32 +27,85 @@ __license__ = "Apache 2.0"
 
 
 class UIBlackTerminal:
-    def __init__(self):
+    def __init__(self, log_name=None, restart_log=True, log_level=6):
+        """
+
+        :param log_name: Name of log file to be written in local directory (Only Alphanumeric chars permitted)
+        :type log_name: str
+        :param restart_log: Whether the log should be started anew upon each execution
+        :type restart_log: bool
+        :param log_level: 0 - 7 - Conforms to https://en.wikipedia.org/wiki/Syslog#Severity_level
+        :type log_level: int
+        """
+        if restart_log:
+            filemode = "w"
+        else:
+            filemode = "a"
+        if isinstance(log_name, str):
+            # Keep only alphanumerics
+            self._program_name = re.sub("\W", "", log_name)
+            # Truncate name to 50 chars
+            self._program_name = self._program_name[0:50]
+            self._program_name = self._program_name.lower()
+            if len(self._program_name) < 3:
+                # Keep only alphanumerics in case __name__ has wierdness
+                self._program_name = re.sub("\W", "", __name__).lower()
+        else:
+            self._program_name = re.sub("\W", "", __name__).lower()
+
+        self._logger = logging.getLogger(self._program_name)
+        logging.basicConfig(
+            filename=f"{self._program_name}.log",
+            filemode=filemode,
+            format="%(levelname)s - %(asctime)s - %(message)s",
+            datefmt="%y-%b-%d %H:%M:%S (%z)",
+        )
+        self.set_log_level(log_level)
+
         self._title = None
         self._pattern_text = re.compile("([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+")
 
         self._low_latency_index = 0
         self._low_latency_max = 100
 
-        self.term = Terminal()
-        self.term.enter_fullscreen
+        self._term = Terminal()
+        self._term.enter_fullscreen
 
-        self.default_bg = f"{self.term.on_black}"
-        self.window_bg = f"{self.term.reverse}"
-        self.error_bg = f"{self.term.on_white}"
-        self.warn_bg = f"{self.term.on_black}"
+        self._default_bg = f"{self._term.on_black}"
+        self._window_bg = f"{self._term.reverse}"
+        self._error_bg = f"{self._term.on_white}"
+        self._warn_bg = f"{self._term.on_black}"
 
-        self.default_style = f"{self.term.normal}{self.term.white}{self.default_bg}"
-        self.window_style = f"{self.term.normal}{self.term.white}{self.window_bg}"
-        self.error_style = f"{self.term.normal}{self.term.red}{self.error_bg}"
-        self.warn_style = f"{self.term.normal}{self.term.yellow}{self.warn_bg}"
+        self._default_style = f"{self._term.normal}{self._term.white}{self._default_bg}"
+        self._window_style = f"{self._term.normal}{self._term.white}{self._window_bg}"
+        self._error_style = f"{self._term.normal}{self._term.red}{self._error_bg}"
+        self._warn_style = f"{self._term.normal}{self._term.yellow}{self._warn_bg}"
 
         self.update_counter_interval = 100
         self._update_counter = 0
         self.console_scrollback = 500
         self._contents_console = []
-        self._previous_height = self.term.height
-        self._previous_width = self.term.width
+        self._previous_height = self._term.height
+        self._previous_width = self._term.width
+
+    def set_log_level(self, log_level):
+        """
+        Sets logging level
+        :param log_level: 0 - 7 Conforms to https://en.wikipedia.org/wiki/Syslog#Severity_level
+        :type log_level: int
+        """
+        if log_level == 7:
+            self._logger.setLevel(logging.DEBUG)
+        elif log_level in [6, 5]:
+            self._logger.setLevel(logging.INFO)
+        elif log_level == 4:
+            self._logger.setLevel(logging.WARNING)
+        elif log_level == 3:
+            self._logger.setLevel(logging.ERROR)
+        elif log_level in [2, 1, 0]:
+            self._logger.setLevel(logging.CRITICAL)
+        else:
+            self._logger.setLevel(logging.NOTSET)
 
     def _skip_iteration(self, is_low_latency_enabled):
         # Low latency was set, have we hit max?
@@ -68,52 +122,81 @@ class UIBlackTerminal:
     def _check_update(self):
         self._update_counter += 1
         previous_total = self._previous_height + self._previous_width
-        current_total = self.term.height + self.term.width
+        current_total = self._term.height + self._term.width
         if (
             self._update_counter >= self.update_counter_interval
             or current_total != previous_total
         ):
-            self._previous_height = self.term.height
-            self._previous_width = self.term.width
+            self._previous_height = self._term.height
+            self._previous_width = self._term.width
             self._update_counter = 0
             self.clear()
             self._display_main_title()
 
     def _get_time_string(self):
         now = datetime.datetime.now()
-        if self.term.does_styling:
-            return f"{self.term.olivedrab}[{self.term.turquoise}{now.strftime('%H:%M')}{self.term.olivedrab}]{self.default_style} "
+        if self._term.does_styling:
+            return f"{self._term.olivedrab}[{self._term.turquoise}{now.strftime('%H:%M')}{self._term.olivedrab}]{self._default_style} "
         else:
             return f"[{now.strftime('%H:%M')}] "
 
-    def print(self, text, right=None, down=None):
+    def print(self, text, right=None, down=None, ignore_log=False):
+        """
+        Prints normally, or prints to a specified X,Y coordinate on screen.
+        Optionally, can ignore logging of text.
+        :param text: Text to be written on screen
+        :type text: str
+        :param right: X coordinate on screen
+        :type right: int
+        :param down: Y coordinate on screen
+        :type down: int
+        :param ignore_log: Prevent logging of the text
+        :type ignore_log: bool
+        """
+        if not ignore_log:
+            self._logger.info(text)
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
+        if self._term.does_styling:
             if (down is not None) and (right is not None):
-                if down > self.term.height:
-                    down = self.term.height
-                if right > self.term.width + len(text):
-                    right = self.term.width - len(text)
+                if down > self._term.height:
+                    down = self._term.height
+                if right > self._term.width + len(text):
+                    right = self._term.width - len(text)
                 if right < 0:
                     right = 0
                 if down < 0:
                     down = 0
-                with self.term.location():
+                with self._term.location():
                     print(
-                        self.term.move(down, right) + f"{self.default_style}{text}",
+                        self._term.move(down, right) + f"{self._default_style}{text}",
                         end="",
                     )
             else:
-                print(f"{self.default_style}{text}")
+                print(f"{self._default_style}{text}")
         else:
             print(text)
 
     def _clear_console(self):
-        bar = " " * self.term.width
-        for row in range(1, self.term.height):
-            self.print(bar, 0, row)
+        bar = " " * self._term.width
+        for row in range(1, self._term.height):
+            self.print(bar, 0, row, True)
 
-    def console(self, text, low_latency=False):
+    def console(self, text, low_latency=False, ignore_log=False):
+        """
+        Write text to the virtual console similar to standard lib print()
+        :param text: Text to be printed
+        :type text: str
+        :param low_latency: Save text, but only print every 100 iterations to reduce latency
+        :type low_latency: bool
+        :param ignore_log: Do not log text
+        :type ignore_log: bool
+        :return:
+        """
+        if not ignore_log and not low_latency:
+            self._logger.info(text)
+        elif not ignore_log and low_latency:
+            self._logger.debug(text)
+
         self._contents_console.append(text)
         while len(self._contents_console) >= self.console_scrollback:
             self._contents_console.pop(0)
@@ -123,24 +206,27 @@ class UIBlackTerminal:
         inverse_index = 0
         for index in range(len(self._contents_console) - 1, 0, -1):
             if self._title is None:
-                if ((self.term.height - 3) - inverse_index) < 0:
+                if ((self._term.height - 3) - inverse_index) < 0:
                     break
             else:
-                if ((self.term.height - 3) - inverse_index) < 1:
+                if ((self._term.height - 3) - inverse_index) < 1:
                     break
-            pad = " " * (self.term.width - len(self._contents_console[index]))
+            pad = " " * (self._term.width - len(self._contents_console[index]))
             self.print(
                 f"{self._contents_console[index]}{pad}",
                 0,
-                (self.term.height - 3) - inverse_index,
+                (self._term.height - 3) - inverse_index,
+                True,
             )
             inverse_index += 1
 
     def notice(self, text):
+        self._logger.info((text))
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
+        if self._term.does_styling:
             self.console(
-                f"{self._get_time_string()}{self.default_style}{text}{self.default_style}"
+                f"{self._get_time_string()}{self._default_style}{text}{self._default_style}",
+                True,
             )
         else:
             print(f"{self._get_time_string()}{text}")
@@ -149,195 +235,207 @@ class UIBlackTerminal:
         self.notice(*args)
 
     def error(self, text):
+        self._logger.error(text)
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
+        if self._term.does_styling:
             self.console(
-                f"{self._get_time_string()}{self.error_style}{text}{self.default_style}"
+                f"{self._get_time_string()}{self._error_style}{text}{self._default_style}",
+                True,
             )
         else:
             print(f"{self._get_time_string()}{text}")
 
     def warn(self, text):
+        self._logger.warning(text)
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
+        if self._term.does_styling:
             self.console(
-                f"{self._get_time_string()}{self.warn_style}{text}{self.default_style}"
+                f"{self._get_time_string()}{self._warn_style}{text}{self._default_style}",
+                True,
             )
         else:
             print(f"{self._get_time_string()}{text}")
 
-    def print_center(self, text, style=None, corner=None):
+    def print_center(self, text, style=None, corner=None, ignore_logging=False):
         self._check_update()
+        if not ignore_logging:
+            self._logger.info(text)
         if style is None:
-            style = self.default_style
+            style = self._default_style
         if corner is None:
             corner = " "
 
         center_text = len(text) // 2
         bar = ""
 
-        left_side = (self.term.width // 2) - (center_text + 4)
-        right_side = (self.term.width // 2) + (center_text + 2)
-        top_side = (self.term.height // 2) - 2
-        bottom_side = (self.term.height // 2) + 2
+        left_side = (self._term.width // 2) - (center_text + 4)
+        right_side = (self._term.width // 2) + (center_text + 2)
+        top_side = (self._term.height // 2) - 2
+        bottom_side = (self._term.height // 2) + 2
 
         for _ in range(0, (len(text) + 6)):
             bar = f"{style}{bar} "
 
         for y_coord in range(top_side, bottom_side + 1):
-            with self.term.location(left_side, y_coord):
-                self.print(bar)
+            self.print(bar, left_side, y_coord, True)
 
-        with self.term.location(left_side + 3, top_side + 2):
-            self.print(f"{style}{text}")
-        if self.term.does_styling:
+        self.print(f"{style}{text}", left_side + 3, top_side + 2, True)
+        if self._term.does_styling:
             if corner != " ":
-                with self.term.location(left_side, top_side):
-                    self.print(f"{style}{corner}")
-                with self.term.location(right_side, top_side):
-                    self.print(f"{style}{corner}")
-                with self.term.location(left_side, bottom_side):
-                    self.print(f"{style}{corner}")
-                with self.term.location(right_side, bottom_side):
-                    self.print(f"{style}{corner}")
+                self.print(f"{style}{corner}", left_side, top_side, True)
+                self.print(f"{style}{corner}", right_side, top_side, True)
+                self.print(f"{style}{corner}", left_side, bottom_side, True)
+                self.print(f"{style}{corner}", right_side, bottom_side, True)
 
     def error_center(self, text):
-        self.print_center(text, self.error_style, "!")
+        self._logger.error(text)
+        self.print_center(text, self._error_style, "!", True)
 
     def warn_center(self, text):
-        self.print_center(text, self.warn_style, "*")
+        self._logger.warning(text)
+        self.print_center(text, self._warn_style, "*", True)
 
     def bold(self, text):
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
-            return f"{self.term.bold}{text}{self.default_style}"
+        if self._term.does_styling:
+            return f"{self._term.bold}{text}{self._default_style}"
         else:
             return f"{text}"
 
     def window_text(self, text):
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
-            return f"{self.window_style}{text}{self.default_style}"
+        if self._term.does_styling:
+            return f"{self._window_style}{text}{self._default_style}"
         else:
             return f"{text}"
 
     def underline(self, text):
         # Check if output is going into a pipe or other unformatted output
-        if self.term.does_styling:
-            return f"{self.term.underline}{text}{self.term.no_underline}"
+        if self._term.does_styling:
+            return f"{self._term.underline}{text}{self._term.no_underline}"
         else:
             return f"{text}"
 
     def clear(self):
-        if self.term.does_styling:
-            print(self.term.clear())
+        if self._term.does_styling:
+            print(self._term.clear())
             self._display_main_title()
 
     def quit(self):
-        self.term.exit_fullscreen
+        self._term.exit_fullscreen
 
     def input(self, question=None, obfuscate=False, max_len=None):
-        input_height = self.term.height - 1
+        input_height = self._term.height - 1
         input_offset = 2
 
         if question is None:
             question = "Press [Enter] to continue:"
         else:
             # Truncate questions to the length of the terminal window
-            question = question[0 : self.term.width - input_offset]
-        self.print(f"{question}", input_offset, input_height - 1)
+            question = question[0 : self._term.width - input_offset]
+        self._logger.debug(question)
+        self.print(f"{question}", input_offset, input_height - 1, True)
 
         if max_len is None:
-            max_len = self.term.width - 3
+            max_len = self._term.width - 3
         result = ""
-        with self.term.cbreak():
+        with self._term.cbreak():
             while True:
                 val = ""
-                val = self.term.inkey()
+                val = self._term.inkey()
                 found = self._pattern_text.match(val)
                 if val.name == "KEY_ENTER":
                     break
                 elif val.is_sequence:
                     print("got sequence: {0}.".format((str(val), val.name, val.code)))
                 elif val.name == "KEY_BACKSPACE" or val.name == "KEY_DELETE":
-                    self.print(" " * len(result), input_offset, input_height)
+                    self.print(" " * len(result), input_offset, input_height, True)
                     result = result[:-1]
                     if obfuscate:
-                        self.print("*" * len(result), input_offset, input_height)
+                        self.print("*" * len(result), input_offset, input_height, True)
                     else:
-                        self.print(result, input_offset, input_height)
+                        self.print(result, input_offset, input_height, True)
                 elif found is not None:
                     if (len(result) + 1) <= max_len:
                         result = f"{result}{val}"
                     else:
                         continue
                     if obfuscate:
-                        self.print("*" * len(result), input_offset, input_height)
+                        self.print("*" * len(result), input_offset, input_height, True)
                     else:
-                        self.print(result, input_offset, input_height)
-        self.print(f"{' ' * self.term.width}", 0, input_height - 1)
-        self.print(f"{' ' * self.term.width}", 0, input_height)
+                        self.print(result, input_offset, input_height, True)
+        self.print(f"{' ' * self._term.width}", 0, input_height - 1, True)
+        self.print(f"{' ' * self._term.width}", 0, input_height, True)
 
         return result
 
     def _display_main_title(self):
-        if not self.term.does_styling:
+        if not self._term.does_styling:
             return
         if self._title is None:
             return
         center_text = len(self._title) // 2
-        center_screen = self.term.width // 2
+        center_screen = self._term.width // 2
         final_location = center_screen - center_text
-        location_tuple = self.term.get_location()
+        location_tuple = self._term.get_location()
         if location_tuple[0] < 1:
             print("")
             # Moving the console cursor down by one to prevent overwriting title
-        self.print(self.window_text(f"{' ' * self.term.width}"), 0, 0)
-        self.print(self.window_text(self._title), final_location, 0)
+        self.print(self.window_text(f"{' ' * self._term.width}"), 0, 0, True)
+        self.print(self.window_text(self._title), final_location, 0, True)
 
     def set_main_title(self, new_title):
         if new_title is not None:
             # Truncate titles to the length of the terminal window
-            new_title = new_title[0 : self.term.width]
+            new_title = new_title[0 : self._term.width]
         self._title = new_title
+        self._logger.info(self._title)
         self._display_main_title()
 
     def ask_list(self, question, menu_list):
-        menu_height = self.term.height // 2
-        menu_offset = self.term.width // 2
+        self._logger.debug(question)
+        menu_height = self._term.height // 2
+        menu_offset = self._term.width // 2
         menu_top = menu_height - (len(menu_list) + 1)
         # Truncate questions to the length of the terminal window
-        question = question[0 : self.term.width - 2]
+        question = question[0 : self._term.width - 2]
         self.print(f"{question}", (menu_offset - len(question)), menu_top - 2)
 
         index = 0
         for menu_item in menu_list:
             item_offset = menu_offset
-            self.print(f"{menu_item}", item_offset, (menu_top + index))
+            self.print(f"{menu_item}", item_offset, (menu_top + index), True)
             index += 2
 
         index = 0
         index_max = len(menu_list) - 1
-        with self.term.cbreak():
+        with self._term.cbreak():
             while True:
                 self.print(
-                    f"{self.term.reverse}{menu_list[index]}",
+                    f"{self._term.reverse}{menu_list[index]}",
                     menu_offset,
                     (menu_top + (index * 2)),
+                    True,
                 )
-                val = self.term.inkey()
+                val = self._term.inkey()
                 if val.name == "KEY_ENTER":
                     break
                 elif val.name == "KEY_UP":
                     self.print(
-                        f"{menu_list[index]}", menu_offset, (menu_top + (index * 2))
+                        f"{menu_list[index]}",
+                        menu_offset,
+                        (menu_top + (index * 2)),
+                        True,
                     )
                     index -= 1
                     if index < 0:
                         index = index_max
                 elif val.name == "KEY_DOWN":
                     self.print(
-                        f"{menu_list[index]}", menu_offset, (menu_top + (index * 2))
+                        f"{menu_list[index]}",
+                        menu_offset,
+                        (menu_top + (index * 2)),
+                        True,
                     )
                     index += 1
                     if index > index_max:
@@ -356,27 +454,28 @@ class UIBlackTerminal:
             red = 2 * (100 - percent)
             green = 2 * percent
             blue = 0
-        if self.term.does_styling:
-            return self.term.color_rgb(red, green, blue)
+        if self._term.does_styling:
+            return self._term.color_rgb(red, green, blue)
         else:
-            return self.default_style
+            return self._default_style
 
     def load_bar(self, title, iteration, total, low_latency=False, bar_length=50):
+        self._logger.debug(title)
         if self._skip_iteration(low_latency):
             return
 
-        if (bar_length + 6) > self.term.width:
-            bar_length = self.term.width - 6
-        bar_left_extent = (self.term.width // 2) - ((bar_length + 2) // 2)
-        bar_upward_extent = self.term.height // 2
-        title_left_extent = (self.term.width // 2) - ((len(title) + 2) // 2)
+        if (bar_length + 6) > self._term.width:
+            bar_length = self._term.width - 6
+        bar_left_extent = (self._term.width // 2) - ((bar_length + 2) // 2)
+        bar_upward_extent = self._term.height // 2
+        title_left_extent = (self._term.width // 2) - ((len(title) + 2) // 2)
         try:
             percent = int(round((iteration / total) * 100))
             fill_len = int(round((bar_length * percent) / 100))
             bar_fill = "█" * fill_len
             bar_empty = " " * (bar_length - fill_len)
-            progress_bar = f"{self.warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self.warn_style}]{self.default_style}"
-            self.print(f"{title}", title_left_extent, bar_upward_extent - 1)
+            progress_bar = f"{self._warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self._warn_style}]{self._default_style}"
+            self.print(f"{title}", title_left_extent, bar_upward_extent - 1, True)
             for offset in range(0, 3):
                 if offset == 1:
                     suffix = f" {percent}%"
@@ -386,33 +485,41 @@ class UIBlackTerminal:
                     f"{progress_bar}{suffix}",
                     bar_left_extent,
                     bar_upward_extent + offset,
+                    True,
                 )
         except ZeroDivisionError:
             pass
 
     def ask_yn(self, question, default_response=False):
-        menu_height = self.term.height // 2
-        menu_offset = self.term.width // 2
+        self._logger.debug(question)
+        menu_height = self._term.height // 2
+        menu_offset = self._term.width // 2
         no_offset = menu_offset + 8
         yes_offset = menu_offset - 8
         menu_top = menu_height - 1
         # Truncate questions to the length of the terminal window
-        question = question[0 : self.term.width - 2]
-        self.print(f"{question}", (menu_offset - (len(question) // 2)), menu_top - 2)
+        question = question[0 : self._term.width - 2]
+        self.print(
+            f"{question}", (menu_offset - (len(question) // 2)), menu_top - 2, True
+        )
 
-        self.print("YES", yes_offset, menu_height)
-        self.print("NO", no_offset, menu_height)
+        self.print("YES", yes_offset, menu_height, True)
+        self.print("NO", no_offset, menu_height, True)
 
         index = default_response
-        with self.term.cbreak():
+        with self._term.cbreak():
             while True:
                 if index:
-                    self.print(f"{self.term.reverse}YES", yes_offset, menu_height)
-                    self.print(f"{self.term.default}NO", no_offset, menu_height)
+                    self.print(
+                        f"{self._term.reverse}YES", yes_offset, menu_height, True
+                    )
+                    self.print(f"{self._term.default}NO", no_offset, menu_height, True)
                 else:
-                    self.print(f"{self.term.default}YES", yes_offset, menu_height)
-                    self.print(f"{self.term.reverse}NO", no_offset, menu_height)
-                val = self.term.inkey()
+                    self.print(
+                        f"{self._term.default}YES", yes_offset, menu_height, True
+                    )
+                    self.print(f"{self._term.reverse}NO", no_offset, menu_height, True)
+                val = self._term.inkey()
                 if val.name == "KEY_ENTER":
                     break
                 elif val.name == "KEY_RIGHT" or val == "n":
