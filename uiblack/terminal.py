@@ -2,6 +2,7 @@ from blessed import Terminal
 import re
 import datetime
 import logging
+import logging.handlers
 import traceback
 
 """uiblack.py: Streamlined cross-platform Textual UI"""
@@ -28,16 +29,20 @@ __license__ = "Apache 2.0"
 
 
 class UIBlackTerminal:
-    def __init__(self, log_name=None, restart_log=True, log_level=6):
+    def __init__(self, log_name, **kwargs):
         """
 
-        :param log_name: Name of log file to be written in local directory (Only Alphanumeric chars permitted)
+        :param log_name: (Required) Name of log file to be written in local directory (Only Alphanumeric chars permitted)
         :type log_name: str
-        :param restart_log: Whether the log should be started anew upon each execution
-        :type restart_log: bool
-        :param log_level: 0 - 7 - Conforms to https://en.wikipedia.org/wiki/Syslog#Severity_level
-        :type log_level: int
+        :keyword restart_log: (bool) Whether the log should be started anew upon each execution
+        :keyword log_level: (int) 0 - 7 - Conforms to https://en.wikipedia.org/wiki/Syslog#Severity_level
+        :keyword sysloghost: (str) Hostname or IP of Syslog server (Can also be localhost)
+        :keyword syslogport: (int) Port of Syslog server, (514 is standard on many systems)
         """
+        sysloghost = kwargs.get("sysloghost", None)
+        syslogport = kwargs.get("syslogport", None)
+        restart_log = kwargs.get("restart_log", True)
+        log_level = kwargs.get("log_level", 6)
         if restart_log:
             filemode = "w"
         else:
@@ -58,19 +63,24 @@ class UIBlackTerminal:
         logging.basicConfig(
             filename=f"{self._program_name}.log",
             filemode=filemode,
-            format="%(levelname)s - %(asctime)s - %(message)s",
+            format=f"{self._program_name} - %(levelname)s - %(asctime)s - %(message)s",
             datefmt="%y-%b-%d %H:%M:%S (%z)",
         )
+        if isinstance(sysloghost, str) and isinstance(syslogport, int):
+            self._logger.addHandler(
+                logging.handlers.SysLogHandler(address=(sysloghost, syslogport))
+            )
         self.set_log_level(log_level)
 
         self._title = None
-        self._pattern_text = re.compile("([A-Za-z0-9 \-:().`+,!@<>#$%^&*;\\/\|])+")
+        self._pattern_text = re.compile("([ -~])")
 
         self._low_latency_index = 0
         self._low_latency_max = 100
 
         self._term = Terminal()
-        self._term.enter_fullscreen
+        self._term.enter_fullscreen()
+        self._term.hidden_cursor()
 
         self._default_bg = f"{self._term.on_black}"
         self._window_bg = f"{self._term.reverse}"
@@ -85,7 +95,7 @@ class UIBlackTerminal:
         self.update_counter_interval = 100
         self._update_counter = 0
         self.console_scrollback = 500
-        self._contents_console = []
+        self._contents_console = [""]
         self._previous_height = self._term.height
         self._previous_width = self._term.width
 
@@ -119,6 +129,48 @@ class UIBlackTerminal:
                 self._low_latency_index += 1  # Have not hit max, so increment
                 return True  # and skip this execution
         return False
+
+    def _len_printable(self, text):
+        return len(self._term.strip(text))
+
+    def _refresh_console(self):
+        fixed_width = self._term.width
+        fixed_height = self._term.height
+
+        while len(self._contents_console) >= self.console_scrollback:
+            self._contents_console.pop(0)
+
+        # final_output_list = []
+        # for list_item in self._contents_console:
+        #     result = self._term.strip(list_item)
+        #     if len(list_item) > fixed_width:
+        #         result = f"{list_item[0: fixed_width - 3]}..."
+        #     final_output_list.append(result)
+
+        self._check_update()
+        inverse_index = 0
+
+        for index in range(len(self._contents_console) - 1, 0, -1):
+            if self._title is None:
+                if ((fixed_height - 3) - inverse_index) < 0:
+                    break
+            else:
+                if ((fixed_height - 3) - inverse_index) < 1:
+                    break
+            actual_len = self._len_printable(self._contents_console[index])
+            pad = " " * (fixed_width - (actual_len + 1))
+            if actual_len > fixed_width:
+                offset = actual_len - (fixed_width - 5)
+                result = f"{self._contents_console[index][:-offset]}..."
+            else:
+                result = self._contents_console[index]
+            self.print(
+                f"{result}{pad}",
+                0,
+                (fixed_height - 3) - inverse_index,
+                True,
+            )
+            inverse_index += 1
 
     def _check_update(self):
         self._update_counter += 1
@@ -193,6 +245,7 @@ class UIBlackTerminal:
         :type ignore_log: bool
         :return:
         """
+
         if not ignore_log and not low_latency:
             self._logger.info(text)
         elif not ignore_log and low_latency:
@@ -201,32 +254,18 @@ class UIBlackTerminal:
         self._contents_console.append(text)
         while len(self._contents_console) >= self.console_scrollback:
             self._contents_console.pop(0)
+
         if self._skip_iteration(low_latency):
             return
-        self._check_update()
-        inverse_index = 0
-        for index in range(len(self._contents_console) - 1, 0, -1):
-            if self._title is None:
-                if ((self._term.height - 3) - inverse_index) < 0:
-                    break
-            else:
-                if ((self._term.height - 3) - inverse_index) < 1:
-                    break
-            pad = " " * (self._term.width - len(self._contents_console[index]))
-            self.print(
-                f"{self._contents_console[index]}{pad}",
-                0,
-                (self._term.height - 3) - inverse_index,
-                True,
-            )
-            inverse_index += 1
+
+        self._refresh_console()
 
     def notice(self, text):
         self._logger.info((text))
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
             self.console(
-                f"{self._get_time_string()}{self._default_style}{text}{self._default_style}",
+                f"{self._get_time_string()}{self._default_style}{text}",
                 True,
             )
         else:
@@ -240,7 +279,7 @@ class UIBlackTerminal:
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
             self.console(
-                f"{self._get_time_string()}{self._error_style}{text}{self._default_style}",
+                f"{self._get_time_string()}{self._error_style}{text}",
                 True,
             )
         else:
@@ -251,7 +290,7 @@ class UIBlackTerminal:
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
             self.console(
-                f"{self._get_time_string()}{self._warn_style}{text}{self._default_style}",
+                f"{self._get_time_string()}{self._warn_style}{text}",
                 True,
             )
         else:
@@ -299,14 +338,14 @@ class UIBlackTerminal:
     def bold(self, text):
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
-            return f"{self._term.bold}{text}{self._default_style}"
+            return f"{self._term.bold}{text}"
         else:
             return f"{text}"
 
     def window_text(self, text):
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
-            return f"{self._window_style}{text}{self._default_style}"
+            return f"{self._window_style}{text}"
         else:
             return f"{text}"
 
@@ -550,9 +589,9 @@ class UIBlackTerminal:
                 return func(*args, **kwargs)
             except Exception as e:
                 trace = traceback.format_exc(limit=-1).replace("\n", " >> ")
-                self.error(f"Exception: {trace}")
                 # Yes, I could have used self_logger.exception(), but this way ensures a single line output on the log
-                self._logger.error(f"Exception: {trace}")
+                self.error(f"Exception: {trace}")
+                self._refresh_console()
 
         return function_wrapper
 
