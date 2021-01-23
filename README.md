@@ -61,9 +61,9 @@ def troublesome_func():
 def some_other_func(param):
     raise ImportError
 ```
-###Console output
+### Console output
 ![Example Traceback](docs/example_traceback.png)
-###Syslog output
+### Syslog output
 ![Example syslog](docs/example_syslog.png)
 
 ## Usage examples
