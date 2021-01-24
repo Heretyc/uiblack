@@ -91,6 +91,7 @@ class UIBlackTerminal:
         self._window_style = f"{self._term.normal}{self._term.white}{self._window_bg}"
         self._error_style = f"{self._term.normal}{self._term.red}{self._error_bg}"
         self._warn_style = f"{self._term.normal}{self._term.yellow}{self._warn_bg}"
+        self._default_style = f"{self._term.normal}{self._term.snow3}{self._default_bg}"
 
         self.update_counter_interval = 100
         self._update_counter = 0
@@ -264,7 +265,9 @@ class UIBlackTerminal:
         self._refresh_console()
 
     def notice(self, text):
-        self._logger.info((text))
+        self._logger.info(text)
+        if not self._logger.level <= logging.INFO:
+            return
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
             self.console(
@@ -277,8 +280,23 @@ class UIBlackTerminal:
     def info(self, *args):
         self.notice(*args)
 
+    def debug(self, text):
+        self._logger.debug(text)
+        if not self._logger.level <= logging.DEBUG:
+            return
+        # Check if output is going into a pipe or other unformatted output
+        if self._term.does_styling:
+            self.console(
+                f"{self._get_time_string()}{self._default_style}{text}",
+                True,
+            )
+        else:
+            print(f"{self._get_time_string()}{text}")
+
     def error(self, text):
         self._logger.error(text)
+        if not self._logger.level <= logging.ERROR:
+            return
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
             self.console(
@@ -290,6 +308,8 @@ class UIBlackTerminal:
 
     def warn(self, text):
         self._logger.warning(text)
+        if not self._logger.level <= logging.WARNING:
+            return
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
             self.console(
@@ -332,10 +352,14 @@ class UIBlackTerminal:
 
     def error_center(self, text):
         self._logger.error(text)
+        if self._logger.level >= logging.ERROR:
+            return
         self.print_center(text, self._error_style, "!", True)
 
     def warn_center(self, text):
         self._logger.warning(text)
+        if self._logger.level >= logging.WARNING:
+            return
         self.print_center(text, self._warn_style, "*", True)
 
     def bold(self, text):
