@@ -140,13 +140,6 @@ class UIBlackTerminal:
         while len(self._contents_console) >= self.console_scrollback:
             self._contents_console.pop(0)
 
-        # final_output_list = []
-        # for list_item in self._contents_console:
-        #     result = self._term.strip(list_item)
-        #     if len(list_item) > fixed_width:
-        #         result = f"{list_item[0: fixed_width - 3]}..."
-        #     final_output_list.append(result)
-
         self._check_update()
         inverse_index = 0
 
@@ -210,15 +203,25 @@ class UIBlackTerminal:
             self._logger.info(text)
         # Check if output is going into a pipe or other unformatted output
         if self._term.does_styling:
+            actual_len = self._len_printable(text)
             if (down is not None) and (right is not None):
                 if down > self._term.height:
-                    down = self._term.height
-                if right > self._term.width + len(text):
-                    right = self._term.width - len(text)
+                    # Since all the text will not be displayable, skip
+                    return
+                if right > self._term.width:
+                    return
+                if right + actual_len > self._term.width:
+                    # Truncate the string to prevent wraparound
+                    # We take off the right side of the string to deal with formatting non-printables being on the left
+                    offset = self._term.width - right
+                    trim = actual_len - offset
+                    if trim < 1:
+                        return
+                    text = f"{text[:-trim]}"
                 if right < 0:
-                    right = 0
+                    return
                 if down < 0:
-                    down = 0
+                    return
                 with self._term.location():
                     print(
                         self._term.move(down, right) + f"{self._default_style}{text}",
