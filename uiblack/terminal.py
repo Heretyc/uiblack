@@ -122,6 +122,20 @@ class UIBlackTerminal:
         else:
             self._logger.setLevel(logging.NOTSET)
 
+    def set_low_latency_refresh_interval(self, interval: int):
+        """
+        When using the low_latency argument for various functions,
+        specify the number of display intervals before refreshing
+        :param interval: Number of intervals before refreshing the display
+        :type interval: int
+        """
+        if round(interval) < 0:
+            interval = 100
+        elif round(interval) > 9223372036854775807:
+            # Old Python max int size, just trying to keep this somewhat sane
+            interval = 9223372036854775807
+        self.update_counter_interval = round(interval)
+
     def _get_dimensions(self, console_letter):
         if console_letter.lower() == "a":
             percentage = self.console_a_percentage
