@@ -218,6 +218,7 @@ class UIBlackTerminal:
             self._update_counter = 0
             self.clear()
             self._display_main_title()
+            self._refresh_consoles()
 
     def _get_time_string(self):
         now = datetime.datetime.now()
@@ -444,6 +445,7 @@ class UIBlackTerminal:
         self._term.exit_fullscreen
 
     def input(self, question=None, obfuscate=False, max_len=None):
+        self._refresh_consoles()
         input_height = self._term.height - 1
         input_offset = 2
 
@@ -512,6 +514,7 @@ class UIBlackTerminal:
         self._display_main_title()
 
     def ask_list(self, question, menu_list):
+        self._refresh_consoles()
         self._logger.debug(question)
         menu_height = self._term.height // 2
         menu_offset = self._term.width // 2
@@ -582,7 +585,7 @@ class UIBlackTerminal:
         self._logger.debug(title)
         if self._skip_iteration(low_latency):
             return
-
+        self._check_update()
         if (bar_length + 6) > self._term.width:
             bar_length = self._term.width - 6
         bar_left_extent = (self._term.width // 2) - ((bar_length + 2) // 2)
@@ -594,6 +597,7 @@ class UIBlackTerminal:
             bar_fill = "█" * fill_len
             bar_empty = " " * (bar_length - fill_len)
             progress_bar = f"{self._warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self._warn_style}]{self._default_style}"
+            self.print(" " * bar_length, bar_left_extent, bar_upward_extent - 1, True)
             self.print(f"{title}", title_left_extent, bar_upward_extent - 1, True)
             for offset in range(0, 3):
                 if offset == 1:
@@ -611,6 +615,7 @@ class UIBlackTerminal:
 
     def ask_yn(self, question, default_response=False):
         self._logger.debug(question)
+        self._refresh_consoles()
         menu_height = self._term.height // 2
         menu_offset = self._term.width // 2
         no_offset = menu_offset + 8
@@ -648,7 +653,7 @@ class UIBlackTerminal:
 
         return index
 
-    def wrapper(self, func):
+    def wrapper(self, func: object) -> object:
         """
         Use the following example in your own code:
         from uiblack.terminal import UIBlackTerminal
@@ -669,14 +674,15 @@ class UIBlackTerminal:
             except Exception as e:
                 trace = traceback.format_exc(limit=-1).replace("\n", " >> ")
                 # Yes, I could have used self_logger.exception(), but this way ensures a single line output on the log
-                self.error(f"Exception: {trace}")
+                console = kwargs.get("console", "a")
+                self.error(f"Exception: {trace}", console=console)
                 self._refresh_consoles()
 
         return function_wrapper
 
 
 if __name__ == "__main__":
-    ui = UIBlackTerminal()
+    ui = UIBlackTerminal("error")
     ui.clear()
     ui.error_center("UIBlack should not be run directly.")
     exit(1)
