@@ -70,6 +70,8 @@ class UIBlackTerminal:
             self._logger.addHandler(
                 logging.handlers.SysLogHandler(address=(sysloghost, syslogport))
             )
+        self.console_a_percentage = 0.75
+        self.console_b_percentage = 1 - self.console_a_percentage
         self.set_log_level(log_level)
 
         self._title = None
@@ -96,7 +98,8 @@ class UIBlackTerminal:
         self.update_counter_interval = 100
         self._update_counter = 0
         self.console_scrollback = 500
-        self._contents_console = [""]
+        self._contents_console_a = [""]
+        self._contents_console_b = [""]
         self._previous_height = self._term.height
         self._previous_width = self._term.width
 
@@ -119,6 +122,35 @@ class UIBlackTerminal:
         else:
             self._logger.setLevel(logging.NOTSET)
 
+    def _get_dimensions(self, console_letter):
+        if console_letter.lower() == "a":
+            percentage = self.console_a_percentage
+        elif console_letter.lower() == "b":
+            percentage = self.console_b_percentage
+
+        width = self._term.width
+        height = round(self._term.height * percentage)
+
+        if console_letter.lower() == "a":
+            if self._title is None:
+                ceiling = 0
+            else:
+                ceiling = 1
+        else:
+            ceiling = self._term.height - height
+
+        return width, height, ceiling
+
+    def _horiz_divider_dimensions(self):
+        width, height, ceiling = self._get_dimensions("b")
+        divider_height = ceiling - 1
+        return width, divider_height
+
+    def _draw_divider(self):
+        width, divider_height = self._horiz_divider_dimensions()
+        text = "═" * width
+        self.print(text, 0, divider_height, True)
+
     def _skip_iteration(self, is_low_latency_enabled):
         # Low latency was set, have we hit max?
         if is_low_latency_enabled:
@@ -134,37 +166,44 @@ class UIBlackTerminal:
     def _len_printable(self, text):
         return len(self._term.strip(text))
 
-    def _refresh_console(self):
-        fixed_width = self._term.width
-        fixed_height = self._term.height
-
-        while len(self._contents_console) >= self.console_scrollback:
-            self._contents_console.pop(0)
+    def _refresh_console(self, console_letter):
+        fixed_width, fixed_height, ceiling = self._get_dimensions(console_letter)
+        self._draw_divider()
+        while len(self._contents_console_a) >= self.console_scrollback:
+            self._contents_console_a.pop(0)
+        while len(self._contents_console_b) >= self.console_scrollback:
+            self._contents_console_b.pop(0)
 
         self._check_update()
-        inverse_index = 0
 
-        for index in range(len(self._contents_console) - 1, 0, -1):
-            if self._title is None:
-                if ((fixed_height - 3) - inverse_index) < 0:
-                    break
-            else:
-                if ((fixed_height - 3) - inverse_index) < 1:
-                    break
-            actual_len = self._len_printable(self._contents_console[index])
+        if console_letter.lower() == "a":
+            print_height = fixed_height - 2
+            contents = self._contents_console_a
+        else:
+            print_height = (ceiling + fixed_height) - 1
+            contents = self._contents_console_b
+
+        for index in range(len(contents) - 1, 0, -1):
+            if print_height < ceiling:
+                break
+            actual_len = self._len_printable(contents[index])
             pad = " " * (fixed_width - (actual_len + 1))
             if actual_len > fixed_width:
                 offset = actual_len - (fixed_width - 5)
-                result = f"{self._contents_console[index][:-offset]}..."
+                result = f"{contents[index][:-offset]}..."
             else:
-                result = self._contents_console[index]
+                result = contents[index]
             self.print(
                 f"{result}{pad}",
                 0,
-                (fixed_height - 3) - inverse_index,
+                print_height,
                 True,
             )
-            inverse_index += 1
+            print_height -= 1
+
+    def _refresh_consoles(self):
+        self._refresh_console("a")
+        self._refresh_console("b")
 
     def _check_update(self):
         self._update_counter += 1
@@ -238,7 +277,7 @@ class UIBlackTerminal:
         for row in range(1, self._term.height):
             self.print(bar, 0, row, True)
 
-    def console(self, text, low_latency=False, ignore_log=False):
+    def console(self, text, low_latency=False, ignore_log=False, **kwargs):
         """
         Write text to the virtual console similar to standard lib print()
         :param text: Text to be printed
@@ -249,22 +288,27 @@ class UIBlackTerminal:
         :type ignore_log: bool
         :return:
         """
-
         if not ignore_log and not low_latency:
             self._logger.info(text)
         elif not ignore_log and low_latency:
             self._logger.debug(text)
 
-        self._contents_console.append(text)
-        while len(self._contents_console) >= self.console_scrollback:
-            self._contents_console.pop(0)
+        console = kwargs.get("console", "a")
+        if console == "a":
+            self._contents_console_a.append(text)
+            while len(self._contents_console_a) >= self.console_scrollback:
+                self._contents_console_a.pop(0)
+        elif console == "b":
+            self._contents_console_b.append(text)
+            while len(self._contents_console_b) >= self.console_scrollback:
+                self._contents_console_b.pop(0)
 
         if self._skip_iteration(low_latency):
             return
 
-        self._refresh_console()
+        self._refresh_consoles()
 
-    def notice(self, text):
+    def notice(self, text, **kwargs):
         self._logger.info(text)
         if not self._logger.level <= logging.INFO:
             return
@@ -272,15 +316,17 @@ class UIBlackTerminal:
         if self._term.does_styling:
             self.console(
                 f"{self._get_time_string()}{self._default_style}{text}",
+                False,
                 True,
+                **kwargs,
             )
         else:
             print(f"{self._get_time_string()}{text}")
 
-    def info(self, *args):
-        self.notice(*args)
+    def info(self, *args, **kwargs):
+        self.notice(*args, **kwargs)
 
-    def debug(self, text):
+    def debug(self, text, **kwargs):
         self._logger.debug(text)
         if not self._logger.level <= logging.DEBUG:
             return
@@ -288,12 +334,14 @@ class UIBlackTerminal:
         if self._term.does_styling:
             self.console(
                 f"{self._get_time_string()}{self._default_style}{text}",
+                False,
                 True,
+                **kwargs,
             )
         else:
             print(f"{self._get_time_string()}{text}")
 
-    def error(self, text):
+    def error(self, text, **kwargs):
         self._logger.error(text)
         if not self._logger.level <= logging.ERROR:
             return
@@ -301,12 +349,14 @@ class UIBlackTerminal:
         if self._term.does_styling:
             self.console(
                 f"{self._get_time_string()}{self._error_style}{text}",
+                False,
                 True,
+                **kwargs,
             )
         else:
             print(f"{self._get_time_string()}{text}")
 
-    def warn(self, text):
+    def warn(self, text, **kwargs):
         self._logger.warning(text)
         if not self._logger.level <= logging.WARNING:
             return
@@ -314,7 +364,9 @@ class UIBlackTerminal:
         if self._term.does_styling:
             self.console(
                 f"{self._get_time_string()}{self._warn_style}{text}",
+                False,
                 True,
+                **kwargs,
             )
         else:
             print(f"{self._get_time_string()}{text}")
@@ -618,7 +670,7 @@ class UIBlackTerminal:
                 trace = traceback.format_exc(limit=-1).replace("\n", " >> ")
                 # Yes, I could have used self_logger.exception(), but this way ensures a single line output on the log
                 self.error(f"Exception: {trace}")
-                self._refresh_console()
+                self._refresh_consoles()
 
         return function_wrapper
 

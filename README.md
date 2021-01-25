@@ -66,6 +66,24 @@ def some_other_func(param):
 ### Syslog output
 ![Example syslog](docs/example_syslog.png)
 
+## Dual Consoles
+Starting in version 1.1.4 the terminal supports dual console output similar to GNU Screen or tmux.
+
+The upper console is "a" the lower is "b". Address them with keywords appended to the end of the syslog display functions.
+```python
+from uiblack.terminal import UIBlackTerminal
+
+ui = UIBlackTerminal("yourprogram")
+
+ui.debug("Debug text")
+ui.notice("Info text console a", console="a")
+ui.notice("Info text console b", console="b")
+ui.error("error text")
+ui.console("regular text console b", console="b")
+ui.warn("This is a warning on console b", console="b")
+```
+![Example Dual Consoles](docs/example_dual_consoles.png)
+
 ## Usage examples
 Keep it simple. Just import, instance the library, and use it!
 
