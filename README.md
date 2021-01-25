@@ -16,7 +16,7 @@ pip install uiblack
 
 
 ## Logging
-To keep things simple and cross-platform, logs are generated in the eecution directory. (This particular behavior may be subject to change in future builds.)
+To keep things simple and cross-platform, logs are generated in the execution directory. (This particular behavior may be subject to change in future builds.)
 
 By default, [INFO] level messages are logged.
 
