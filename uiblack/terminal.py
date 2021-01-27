@@ -1,9 +1,11 @@
 from blessed import Terminal
 import re
-import datetime
+from datetime import datetime
 import logging
 import logging.handlers
 import traceback
+import math
+from functools import reduce
 
 """uiblack.py: Streamlined cross-platform Textual UI"""
 
@@ -95,13 +97,17 @@ class UIBlackTerminal:
         self._warn_style = f"{self._term.normal}{self._term.yellow}{self._warn_bg}"
         self._default_style = f"{self._term.normal}{self._term.snow3}{self._default_bg}"
 
-        self.update_counter_interval = 100
+        self.update_counter_interval = 10
         self._update_counter = 0
         self.console_scrollback = 500
         self._contents_console_a = [""]
         self._contents_console_b = [""]
         self._previous_height = self._term.height
         self._previous_width = self._term.width
+        self.last_updates_heuristic_enabled = True
+        self._max_last_updates = 5
+        self._last_updates = [datetime.now()]
+        self.heuristic_target_seconds = 2
 
     def set_log_level(self, log_level):
         """
@@ -135,6 +141,26 @@ class UIBlackTerminal:
             # Old Python max int size, just trying to keep this somewhat sane
             interval = 9223372036854775807
         self.update_counter_interval = round(interval)
+
+    def _center_pad_text(self, text, **kwargs):
+        """
+        Centers a string inside a designated length of pad characters (usually whitespace)
+        :param text: (str)(Required) Text to be centered
+        :keyword pad: (str) A single character used to pad out the whitespace
+        :keyword total_len: (int)(Required) Total size that text should be centered and padded into
+        :return: (str) The padded string
+        """
+        pad = kwargs.get("pad", " ")
+        total_len = kwargs.get("total_len", None)
+        if len(text) >= total_len:
+            # Nothing to pad out, the text meets or exceeds the size allotted
+            return text
+        center = round(total_len / 2)
+        text_center = round(len(text) / 2)
+        differential = center - text_center
+        remainder = total_len - (differential + len(text))
+        final = f"{pad * differential}{text}{pad * remainder}"
+        return final
 
     def _get_dimensions(self, console_letter):
         if console_letter.lower() == "a":
@@ -188,8 +214,6 @@ class UIBlackTerminal:
         while len(self._contents_console_b) >= self.console_scrollback:
             self._contents_console_b.pop(0)
 
-        self._check_update()
-
         if console_letter.lower() == "a":
             print_height = fixed_height - 2
             contents = self._contents_console_a
@@ -219,23 +243,70 @@ class UIBlackTerminal:
         self._refresh_console("a")
         self._refresh_console("b")
 
+    def _calculate_update_heuristic(self):
+        """
+        Calculates whether the console is being refreshed at the correct interval to prevent screen flickering
+        The default is one refresh every 2 seconds.
+        This entire process is governed by the variable self.heuristic_target_seconds
+        :return: None
+        """
+        if self.last_updates_heuristic_enabled:
+            self._last_updates.append(datetime.now())
+        if len(self._last_updates) < 5:
+            return
+
+        while True:
+            if len(self._last_updates) > self._max_last_updates:
+                self._last_updates.pop(0)
+            else:
+                break
+
+        target = self.heuristic_target_seconds
+        deltas = []
+        previous_datetime = 0
+        for current_datetime in self._last_updates:
+            if previous_datetime == 0:
+                # This is the first entry, so store and move on
+                previous_datetime = current_datetime
+                continue
+            delta = (current_datetime - previous_datetime).seconds
+            deltas.append(delta)
+            previous_datetime = current_datetime
+        del previous_datetime
+        # Super performant way to average a list, shaves tiny amounts of time from this function
+        average = reduce(lambda x, y: x + y, deltas) / len(deltas)
+        if average <= target:
+            # The refresh times are trending too low, so bump up the interval incrementally
+            ms_to_change = math.sqrt(target - average)
+            self.update_counter_interval += ms_to_change * 20
+        elif average > target:
+            # The refresh times are trending too high, so walk down the interval incrementally
+            ms_to_change = math.sqrt(average - target)
+            self.update_counter_interval += ms_to_change * 10
+        if self.update_counter_interval <= 0:
+            self.update_counter_interval = 1
+
     def _check_update(self):
         self._update_counter += 1
         previous_total = self._previous_height + self._previous_width
         current_total = self._term.height + self._term.width
-        if (
-            self._update_counter >= self.update_counter_interval
-            or current_total != previous_total
-        ):
+        if self._update_counter >= self.update_counter_interval:
+            # This is only reset when triggered by the counter
+            self._update_counter = 0
+            self.clear()
+            self._display_main_title()
+            self._refresh_consoles()
+            # This is only run when the counter is triggered
+            self._calculate_update_heuristic()
+        elif current_total != previous_total:
             self._previous_height = self._term.height
             self._previous_width = self._term.width
-            self._update_counter = 0
             self.clear()
             self._display_main_title()
             self._refresh_consoles()
 
     def _get_time_string(self):
-        now = datetime.datetime.now()
+        now = datetime.now()
         if self._term.does_styling:
             return f"{self._term.olivedrab}[{self._term.turquoise}{now.strftime('%H:%M')}{self._term.olivedrab}]{self._default_style} "
         else:
@@ -279,7 +350,8 @@ class UIBlackTerminal:
                     return
                 with self._term.location():
                     print(
-                        self._term.move(down, right) + f"{self._default_style}{text}",
+                        self._term.move(down, right)
+                        + f"{self._default_style}{text}{self._default_style}",
                         end="",
                     )
             else:
@@ -321,7 +393,7 @@ class UIBlackTerminal:
         if self._skip_iteration(low_latency):
             return
 
-        self._refresh_consoles()
+        self._check_update()
 
     def notice(self, text, **kwargs):
         self._logger.info(text)
@@ -390,32 +462,34 @@ class UIBlackTerminal:
         self._check_update()
         if not ignore_logging:
             self._logger.info(text)
+        if not self._term.does_styling:
+            print(text)
+            return
         if style is None:
-            style = self._default_style
+            style = self._window_style
         if corner is None:
             corner = " "
 
         center_text = len(text) // 2
-        bar = ""
 
         left_side = (self._term.width // 2) - (center_text + 4)
         right_side = (self._term.width // 2) + (center_text + 2)
-        top_side = (self._term.height // 2) - 2
-        bottom_side = (self._term.height // 2) + 2
+        top_side = (self._term.height // 2) - 1
+        bottom_side = (self._term.height // 2) + 1
+        total_len = right_side - left_side
 
-        for _ in range(0, (len(text) + 6)):
-            bar = f"{style}{bar} "
+        if corner != " ":
+            bar = " " * (total_len - 2)
+            bar = f"{style}{corner}{bar}{corner}"
+        else:
+            bar = " " * total_len
+            bar = f"{style}{bar}"
 
-        for y_coord in range(top_side, bottom_side + 1):
-            self.print(bar, left_side, y_coord, True)
+        padded_text = self._center_pad_text(text, total_len=total_len, pad=" ")
 
-        self.print(f"{style}{text}", left_side + 3, top_side + 2, True)
-        if self._term.does_styling:
-            if corner != " ":
-                self.print(f"{style}{corner}", left_side, top_side, True)
-                self.print(f"{style}{corner}", right_side, top_side, True)
-                self.print(f"{style}{corner}", left_side, bottom_side, True)
-                self.print(f"{style}{corner}", right_side, bottom_side, True)
+        self.print(bar, left_side, top_side, True)
+        self.print(f"{style}{padded_text}", left_side, top_side + 1, True)
+        self.print(bar, left_side, bottom_side, True)
 
     def error_center(self, text):
         self._logger.error(text)
@@ -459,7 +533,7 @@ class UIBlackTerminal:
         self._term.exit_fullscreen
 
     def input(self, question=None, obfuscate=False, max_len=None):
-        self._refresh_consoles()
+        self._check_update()
         input_height = self._term.height - 1
         input_offset = 2
 
@@ -528,7 +602,7 @@ class UIBlackTerminal:
         self._display_main_title()
 
     def ask_list(self, question, menu_list):
-        self._refresh_consoles()
+        self._check_update()
         self._logger.debug(question)
         menu_height = self._term.height // 2
         menu_offset = self._term.width // 2
@@ -595,7 +669,7 @@ class UIBlackTerminal:
         else:
             return self._default_style
 
-    def load_bar(self, title, iteration, total, low_latency=False, bar_length=50):
+    def load_bar(self, title, iteration, total, low_latency=True, bar_length=50):
         self._logger.debug(title)
         if self._skip_iteration(low_latency):
             return
@@ -629,7 +703,7 @@ class UIBlackTerminal:
 
     def ask_yn(self, question, default_response=False):
         self._logger.debug(question)
-        self._refresh_consoles()
+        self._check_update()
         menu_height = self._term.height // 2
         menu_offset = self._term.width // 2
         no_offset = menu_offset + 8
@@ -690,7 +764,7 @@ class UIBlackTerminal:
                 # Yes, I could have used self_logger.exception(), but this way ensures a single line output on the log
                 console = kwargs.get("console", "a")
                 self.error(f"Exception: {trace}", console=console)
-                self._refresh_consoles()
+                self._check_update()
 
         return function_wrapper
 
