@@ -669,7 +669,7 @@ class UIBlackTerminal:
         else:
             return self._default_style
 
-    def load_bar(self, title, iteration, total, low_latency=True, bar_length=50):
+    def load_bar(self, title, iteration, total, low_latency=False, bar_length=50):
         self._logger.debug(title)
         if self._skip_iteration(low_latency):
             return
@@ -685,8 +685,10 @@ class UIBlackTerminal:
             bar_fill = "█" * fill_len
             bar_empty = " " * (bar_length - fill_len)
             progress_bar = f"{self._warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self._warn_style}]{self._default_style}"
-            self.print(" " * bar_length, bar_left_extent, bar_upward_extent - 1, True)
-            self.print(f"{title}", title_left_extent, bar_upward_extent - 1, True)
+            padded_title = self._center_pad_text(title, total_len=round(bar_length / 2))
+            self.print(
+                f"{padded_title}", title_left_extent, bar_upward_extent - 1, True
+            )
             for offset in range(0, 3):
                 if offset == 1:
                     suffix = f" {percent}%"
