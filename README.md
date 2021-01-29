@@ -126,6 +126,9 @@ ui.console("And you can see, it scrolls output like the console.")
 ```
 ![Example text](docs/example_text.png)
 
+### Performant
+One major goal has remained from the start, remain performant. To that end, support for thread-safe operation is baked in. Additionally, various functions support "low_latency" mode. This mode causes the screen to be updated every N-number of iterations to prevent wasting cycles to display content.
+
 ## Meta
 
 Brandon Blackburn – [PGP Encrypted Chat @ Keybase](https://keybase.io/blackburnhax/chat)
