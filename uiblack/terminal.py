@@ -6,6 +6,7 @@ import logging.handlers
 import traceback
 import math
 from functools import reduce
+import threading
 
 """uiblack.py: Streamlined cross-platform Textual UI"""
 
@@ -41,6 +42,7 @@ class UIBlackTerminal:
         :keyword sysloghost: (str) Hostname or IP of Syslog server (Can also be localhost)
         :keyword syslogport: (int) Port of Syslog server, (514 is standard on many systems)
         """
+        self._lock = threading.Lock()
         sysloghost = kwargs.get("sysloghost", None)
         syslogport = kwargs.get("syslogport", None)
         restart_log = kwargs.get("restart_log", True)
@@ -80,7 +82,7 @@ class UIBlackTerminal:
         self._pattern_text = re.compile("([ -~])")
 
         self._low_latency_index = 0
-        self._low_latency_max = 100
+        self.low_latency_max = 1000
 
         self._term = Terminal()
         self._term.enter_fullscreen()
@@ -194,7 +196,7 @@ class UIBlackTerminal:
     def _skip_iteration(self, is_low_latency_enabled):
         # Low latency was set, have we hit max?
         if is_low_latency_enabled:
-            if self._low_latency_index >= self._low_latency_max:
+            if self._low_latency_index >= self.low_latency_max:
                 # We hit the max, so run this iteration and reset index
                 self._low_latency_index = 0
                 return False
@@ -287,6 +289,7 @@ class UIBlackTerminal:
             self.update_counter_interval = 1
 
     def _check_update(self):
+        self._lock.acquire()
         self._update_counter += 1
         previous_total = self._previous_height + self._previous_width
         current_total = self._term.height + self._term.width
@@ -304,6 +307,7 @@ class UIBlackTerminal:
             self.clear()
             self._display_main_title()
             self._refresh_consoles()
+        self._lock.release()
 
     def _get_time_string(self):
         now = datetime.now()
@@ -534,6 +538,7 @@ class UIBlackTerminal:
 
     def input(self, question=None, obfuscate=False, max_len=None):
         self._check_update()
+        self._lock.acquire()
         input_height = self._term.height - 1
         input_offset = 2
 
@@ -575,7 +580,7 @@ class UIBlackTerminal:
                         self.print(result, input_offset, input_height, True)
         self.print(f"{' ' * self._term.width}", 0, input_height - 1, True)
         self.print(f"{' ' * self._term.width}", 0, input_height, True)
-
+        self._lock.release()
         return result
 
     def _display_main_title(self):
@@ -603,6 +608,7 @@ class UIBlackTerminal:
 
     def ask_list(self, question, menu_list):
         self._check_update()
+        self._lock.acquire()
         self._logger.debug(question)
         menu_height = self._term.height // 2
         menu_offset = self._term.width // 2
@@ -610,7 +616,6 @@ class UIBlackTerminal:
         # Truncate questions to the length of the terminal window
         question = question[0 : self._term.width - 2]
         self.print(f"{question}", (menu_offset - len(question)), menu_top - 2)
-
         index = 0
         for menu_item in menu_list:
             item_offset = menu_offset
@@ -651,6 +656,7 @@ class UIBlackTerminal:
                     if index > index_max:
                         index = 0
 
+        self._lock.release()
         return menu_list[index]
 
         return result
@@ -706,6 +712,7 @@ class UIBlackTerminal:
     def ask_yn(self, question, default_response=False):
         self._logger.debug(question)
         self._check_update()
+        self._lock.acquire()
         menu_height = self._term.height // 2
         menu_offset = self._term.width // 2
         no_offset = menu_offset + 8
@@ -740,8 +747,29 @@ class UIBlackTerminal:
                     index = False
                 elif val.name == "KEY_LEFT" or val == "y":
                     index = True
-
+        self._lock.release()
         return index
+
+    def download_file(url, title, local_path="./", **kwargs):
+        kwargs["stream"] = True
+        local_filename = url.split("/")[-1]
+        path = local_path + local_filename
+
+        r = requests.get(url, **kwargs)
+        total_size_mb = math.ceil(int(r.headers.get("content-length", 0)) // 1000000)
+
+        mb_downloaded = 0
+        with open(local_filename, "wb") as f:
+            for chunk in r.iter_content(32 * 1024):
+                mb_downloaded += len(chunk) / 1000000
+                if total_size_mb == 0:
+                    ui.print_center(f"Downloaded {round(mb_downloaded, 1)}MB")
+                else:
+                    ui.load_bar(title, mb_downloaded, total_size_mb)
+                if chunk:
+                    f.write(chunk)
+
+        return path
 
     def wrapper(self, func: object) -> object:
         """
