@@ -109,7 +109,7 @@ class UIBlackTerminal:
         self.last_updates_heuristic_enabled = True
         self._max_last_updates = 5
         self._last_updates = [datetime.now()]
-        self.heuristic_target_seconds = 2
+        self.heuristic_target_seconds = 10
 
     def set_log_level(self, log_level):
         """
@@ -248,7 +248,7 @@ class UIBlackTerminal:
     def _calculate_update_heuristic(self):
         """
         Calculates whether the console is being refreshed at the correct interval to prevent screen flickering
-        The default is one refresh every 2 seconds.
+        The default is one refresh every 10 seconds.
         This entire process is governed by the variable self.heuristic_target_seconds
         :return: None
         """
@@ -691,10 +691,8 @@ class UIBlackTerminal:
             bar_fill = "█" * fill_len
             bar_empty = " " * (bar_length - fill_len)
             progress_bar = f"{self._warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self._warn_style}]{self._default_style}"
-            padded_title = self._center_pad_text(title, total_len=round(bar_length / 2))
-            self.print(
-                f"{padded_title}", title_left_extent, bar_upward_extent - 1, True
-            )
+            padded_title = self._center_pad_text(title, total_len=bar_length)
+            self.print(f"{padded_title}", bar_left_extent, bar_upward_extent - 1, True)
             for offset in range(0, 3):
                 if offset == 1:
                     suffix = f" {percent}%"
@@ -749,27 +747,6 @@ class UIBlackTerminal:
                     index = True
         self._lock.release()
         return index
-
-    def download_file(url, title, local_path="./", **kwargs):
-        kwargs["stream"] = True
-        local_filename = url.split("/")[-1]
-        path = local_path + local_filename
-
-        r = requests.get(url, **kwargs)
-        total_size_mb = math.ceil(int(r.headers.get("content-length", 0)) // 1000000)
-
-        mb_downloaded = 0
-        with open(local_filename, "wb") as f:
-            for chunk in r.iter_content(32 * 1024):
-                mb_downloaded += len(chunk) / 1000000
-                if total_size_mb == 0:
-                    ui.print_center(f"Downloaded {round(mb_downloaded, 1)}MB")
-                else:
-                    ui.load_bar(title, mb_downloaded, total_size_mb)
-                if chunk:
-                    f.write(chunk)
-
-        return path
 
     def wrapper(self, func: object) -> object:
         """
