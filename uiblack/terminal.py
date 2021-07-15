@@ -1,5 +1,6 @@
 from blessed import Terminal
 import re
+import os
 from datetime import datetime
 import logging
 import logging.handlers
@@ -47,6 +48,14 @@ class UIBlackTerminal:
         syslogport = kwargs.get("syslogport", None)
         restart_log = kwargs.get("restart_log", True)
         log_level = kwargs.get("log_level", 6)
+        try:
+            override_mode = str(os.environ["UIOVERRIDE"]).strip().lower()
+        except KeyError:
+            override_mode = ""
+        if override_mode == "simple":
+            self.rich_ui = False
+        else:
+            self.rich_ui = True
         if restart_log:
             filemode = "w"
         else:
@@ -189,9 +198,13 @@ class UIBlackTerminal:
         return width, divider_height
 
     def _draw_divider(self):
-        width, divider_height = self._horiz_divider_dimensions()
-        text = "═" * width
-        self.print(text, 0, divider_height, True)
+        if self._term.does_styling and self.rich_ui:
+            width, divider_height = self._horiz_divider_dimensions()
+            text = "═" * width
+            self.print(text, 0, divider_height, True)
+        else:
+            return
+        return
 
     def _skip_iteration(self, is_low_latency_enabled):
         # Low latency was set, have we hit max?
@@ -311,7 +324,7 @@ class UIBlackTerminal:
 
     def _get_time_string(self):
         now = datetime.now()
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             return f"{self._term.olivedrab}[{self._term.turquoise}{now.strftime('%H:%M')}{self._term.olivedrab}]{self._default_style} "
         else:
             return f"[{now.strftime('%H:%M')}] "
@@ -332,7 +345,7 @@ class UIBlackTerminal:
         if not ignore_log:
             self._logger.info(text)
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             actual_len = self._len_printable(text)
             if (down is not None) and (right is not None):
                 if down > self._term.height:
@@ -404,7 +417,7 @@ class UIBlackTerminal:
         if not self._logger.level <= logging.INFO:
             return
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             self.console(
                 f"{self._get_time_string()}{self._default_style}{text}",
                 False,
@@ -422,7 +435,7 @@ class UIBlackTerminal:
         if not self._logger.level <= logging.DEBUG:
             return
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             self.console(
                 f"{self._get_time_string()}{self._default_style}{text}",
                 False,
@@ -437,7 +450,7 @@ class UIBlackTerminal:
         if not self._logger.level <= logging.ERROR:
             return
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             self.console(
                 f"{self._get_time_string()}{self._error_style}{text}",
                 False,
@@ -452,7 +465,7 @@ class UIBlackTerminal:
         if not self._logger.level <= logging.WARNING:
             return
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             self.console(
                 f"{self._get_time_string()}{self._warn_style}{text}",
                 False,
@@ -466,7 +479,7 @@ class UIBlackTerminal:
         self._check_update()
         if not ignore_logging:
             self._logger.info(text)
-        if not self._term.does_styling:
+        if not self._term.does_styling and self.rich_ui:
             print(text)
             return
         if style is None:
@@ -509,27 +522,27 @@ class UIBlackTerminal:
 
     def bold(self, text):
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             return f"{self._term.bold}{text}"
         else:
             return f"{text}"
 
     def window_text(self, text):
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             return f"{self._window_style}{text}"
         else:
             return f"{text}"
 
     def underline(self, text):
         # Check if output is going into a pipe or other unformatted output
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             return f"{self._term.underline}{text}{self._term.no_underline}"
         else:
             return f"{text}"
 
     def clear(self):
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             print(self._term.clear())
             self._display_main_title()
 
@@ -584,7 +597,7 @@ class UIBlackTerminal:
         return result
 
     def _display_main_title(self):
-        if not self._term.does_styling:
+        if not self._term.does_styling and self.rich_ui:
             return
         if self._title is None:
             return
@@ -670,7 +683,7 @@ class UIBlackTerminal:
             red = 2 * (100 - percent)
             green = 2 * percent
             blue = 0
-        if self._term.does_styling:
+        if self._term.does_styling and self.rich_ui:
             return self._term.color_rgb(red, green, blue)
         else:
             return self._default_style
@@ -691,19 +704,31 @@ class UIBlackTerminal:
             bar_fill = "█" * fill_len
             bar_empty = " " * (bar_length - fill_len)
             progress_bar = f"{self._warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self._warn_style}]{self._default_style}"
-            padded_title = self._center_pad_text(title, total_len=bar_length)
-            self.print(f"{padded_title}", bar_left_extent, bar_upward_extent - 1, True)
-            for offset in range(0, 3):
-                if offset == 1:
-                    suffix = f" {percent}%"
-                else:
-                    suffix = ""
+            if self._term.does_styling and self.rich_ui:
+                padded_title = self._center_pad_text(title, total_len=bar_length)
+                self.print(
+                    f"{padded_title}", bar_left_extent, bar_upward_extent - 1, True
+                )
+                for offset in range(0, 3):
+                    if offset == 1:
+                        suffix = f" {percent}%"
+                    else:
+                        suffix = ""
+                    self.print(
+                        f"{progress_bar}{suffix}",
+                        bar_left_extent,
+                        bar_upward_extent + offset,
+                        True,
+                    )
+            else:
+                suffix = f" {percent}%"
                 self.print(
                     f"{progress_bar}{suffix}",
-                    bar_left_extent,
-                    bar_upward_extent + offset,
+                    0,
+                    0,
                     True,
                 )
+
         except ZeroDivisionError:
             pass
 
