@@ -479,7 +479,7 @@ class UIBlackTerminal:
         self._check_update()
         if not ignore_logging:
             self._logger.info(text)
-        if not self._term.does_styling and self.rich_ui:
+        if not self._term.does_styling or not self.rich_ui:
             print(text)
             return
         if style is None:
@@ -597,7 +597,7 @@ class UIBlackTerminal:
         return result
 
     def _display_main_title(self):
-        if not self._term.does_styling and self.rich_ui:
+        if not self._term.does_styling or not self.rich_ui:
             return
         if self._title is None:
             return
