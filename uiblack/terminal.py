@@ -8,6 +8,7 @@ import traceback
 import math
 from functools import reduce
 import threading
+import pathlib
 
 """uiblack.py: Streamlined cross-platform Textual UI"""
 
@@ -71,18 +72,26 @@ class UIBlackTerminal:
                 self._program_name = re.sub("\W", "", __name__).lower()
         else:
             self._program_name = re.sub("\W", "", __name__).lower()
-
+        full_path = pathlib.Path.cwd() / "logs"
+        full_path.mkdir(parents=True, exist_ok=True)
+        full_path = full_path / f"{self._program_name}.log"
         self._logger = logging.getLogger(self._program_name)
+        format_string_local = (
+            f"{self._program_name}: %(levelname)s - %(asctime)s - %(message)s"
+        )
+        format_string_syslog = f"{self._program_name}: %(levelname)s - %(message)s"
         logging.basicConfig(
-            filename=f"{self._program_name}.log",
+            filename=full_path,
             filemode=filemode,
-            format=f"{self._program_name} - %(levelname)s - %(asctime)s - %(message)s",
+            format=format_string_local,
             datefmt="%y-%b-%d %H:%M:%S (%z)",
         )
         if isinstance(sysloghost, str) and isinstance(syslogport, int):
-            self._logger.addHandler(
-                logging.handlers.SysLogHandler(address=(sysloghost, syslogport))
+            self.handler = logging.handlers.SysLogHandler(
+                address=(sysloghost, syslogport)
             )
+            self.handler.formatter = logging.Formatter(format_string_syslog)
+            self._logger.addHandler(self.handler)
         self.console_a_percentage = 0.75
         self.console_b_percentage = 1 - self.console_a_percentage
         self.set_log_level(log_level)
