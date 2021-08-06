@@ -43,20 +43,26 @@ class UIBlackTerminal:
         :keyword log_level: (int) 0 - 7 - Conforms to https://en.wikipedia.org/wiki/Syslog#Severity_level
         :keyword sysloghost: (str) Hostname or IP of Syslog server (Can also be localhost)
         :keyword syslogport: (int) Port of Syslog server, (514 is standard on many systems)
+        :keyword simple: (bool) Use the simplest textual output while preserving logging and other features
         """
         self._lock = threading.Lock()
         sysloghost = kwargs.get("sysloghost", None)
         syslogport = kwargs.get("syslogport", None)
         restart_log = kwargs.get("restart_log", True)
         log_level = kwargs.get("log_level", 6)
-        try:
-            override_mode = str(os.environ["UIOVERRIDE"]).strip().lower()
-        except KeyError:
-            override_mode = ""
-        if override_mode == "simple":
-            self.rich_ui = False
+        simple = kwargs.get("simple", False)
+
+        if not simple:
+            try:
+                override_mode = str(os.environ["UIOVERRIDE"]).strip().lower()
+            except KeyError:
+                override_mode = ""
+            if override_mode == "simple":
+                self.rich_ui = False
+            else:
+                self.rich_ui = True
         else:
-            self.rich_ui = True
+            self.rich_ui = False
         if restart_log:
             filemode = "w"
         else:
@@ -76,9 +82,7 @@ class UIBlackTerminal:
         full_path.mkdir(parents=True, exist_ok=True)
         full_path = full_path / f"{self._program_name}.log"
         self._logger = logging.getLogger(self._program_name)
-        format_string_local = (
-            f"{self._program_name}: %(levelname)s - %(asctime)s - %(message)s"
-        )
+        format_string_local = f"{self._program_name}: %(levelname)s - %(asctime)s - %(message)s"
         format_string_syslog = f"{self._program_name}: %(levelname)s - %(message)s"
         logging.basicConfig(
             filename=full_path,
@@ -87,9 +91,7 @@ class UIBlackTerminal:
             datefmt="%y-%b-%d %H:%M:%S (%z)",
         )
         if isinstance(sysloghost, str) and isinstance(syslogport, int):
-            self.handler = logging.handlers.SysLogHandler(
-                address=(sysloghost, syslogport)
-            )
+            self.handler = logging.handlers.SysLogHandler(address=(sysloghost, syslogport))
             self.handler.formatter = logging.Formatter(format_string_syslog)
             self._logger.addHandler(self.handler)
         self.console_a_percentage = 0.75
@@ -376,8 +378,7 @@ class UIBlackTerminal:
                     return
                 with self._term.location():
                     print(
-                        self._term.move(down, right)
-                        + f"{self._default_style}{text}{self._default_style}",
+                        self._term.move(down, right) + f"{self._default_style}{text}{self._default_style}",
                         end="",
                     )
             else:
@@ -715,9 +716,7 @@ class UIBlackTerminal:
             progress_bar = f"{self._warn_style}[{self._gradient_red_green(percent)}{bar_fill + bar_empty}{self._warn_style}]{self._default_style}"
             if self._term.does_styling and self.rich_ui:
                 padded_title = self._center_pad_text(title, total_len=bar_length)
-                self.print(
-                    f"{padded_title}", bar_left_extent, bar_upward_extent - 1, True
-                )
+                self.print(f"{padded_title}", bar_left_extent, bar_upward_extent - 1, True)
                 for offset in range(0, 3):
                     if offset == 1:
                         suffix = f" {percent}%"
@@ -752,9 +751,7 @@ class UIBlackTerminal:
         menu_top = menu_height - 1
         # Truncate questions to the length of the terminal window
         question = question[0 : self._term.width - 2]
-        self.print(
-            f"{question}", (menu_offset - (len(question) // 2)), menu_top - 2, True
-        )
+        self.print(f"{question}", (menu_offset - (len(question) // 2)), menu_top - 2, True)
 
         self.print("YES", yes_offset, menu_height, True)
         self.print("NO", no_offset, menu_height, True)
@@ -763,14 +760,10 @@ class UIBlackTerminal:
         with self._term.cbreak():
             while True:
                 if index:
-                    self.print(
-                        f"{self._term.reverse}YES", yes_offset, menu_height, True
-                    )
+                    self.print(f"{self._term.reverse}YES", yes_offset, menu_height, True)
                     self.print(f"{self._term.default}NO", no_offset, menu_height, True)
                 else:
-                    self.print(
-                        f"{self._term.default}YES", yes_offset, menu_height, True
-                    )
+                    self.print(f"{self._term.default}YES", yes_offset, menu_height, True)
                     self.print(f"{self._term.reverse}NO", no_offset, menu_height, True)
                 val = self._term.inkey()
                 if val.name == "KEY_ENTER":
